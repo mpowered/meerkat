@@ -2,9 +2,15 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module Check.DiskSpaceUsage where
+module Check.DiskSpaceUsage
+  ( DiskSpaceUsage (..)
+  , freespace
+  )
+where
 
 import           Control.Applicative        (empty)
+import           Control.Error
+import           Control.Monad.IO.Class     (liftIO)
 import qualified Data.Char                  as Char
 import           Data.Text.Lazy             (Text)
 import qualified Data.Text.Lazy             as Text
@@ -59,12 +65,10 @@ df = proc "df" args
     exclusions = concatMap exclude ["tmpfs", "devtmpfs"]
     exclude e = ["-x", e]
 
-freespace :: IO ()
+freespace :: ExceptT String IO [DiskSpaceUsage]
 freespace = do
-  (stdout, _stderr) <- Proc.readProcess_ df
-  parse $ Text.decodeUtf8 stdout
-  where
-    parse x =
-      case M.parse parser "" x of
-        Left err -> print x >> putStr (M.parseErrorPretty err)
-        Right usage -> print usage
+  (stdout, _stderr) <- liftIO $ Proc.readProcess_ df
+  let txt = Text.decodeUtf8 stdout
+  case M.parse parser "" txt of
+    Left err -> throwE (M.parseErrorPretty' txt err)
+    Right usages -> return usages

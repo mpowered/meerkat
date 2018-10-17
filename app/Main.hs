@@ -1,7 +1,12 @@
 module Main where
 
+import Control.Error
+
 import Check.DiskSpaceUsage
 
 main :: IO ()
 main = do
-  freespace
+  exceptT
+    putStrLn
+    (mapM_ print)
+    freespace
