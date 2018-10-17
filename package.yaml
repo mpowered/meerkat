@@ -1,0 +1,55 @@
+name:                meerkat
+version:             0.1.0.0
+github:              "bflyblue/meerkat"
+license:             BSD3
+author:              "Shaun Sharples"
+maintainer:          "shaun.sharples@gmail.com"
+copyright:           "2018 Shaun Sharples"
+
+extra-source-files:
+- README.md
+- ChangeLog.md
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on GitHub at <https://github.com/bflyblue/meerkat#readme>
+
+dependencies:
+- base >= 4.7 && < 5
+- bytestring >= 0.10.8.2 && < 0.11
+- megaparsec >= 6.5.0 && < 6.6
+- text >= 1.2.3 && < 1.3
+- typed-process >= 0.2.3.0 && < 0.3
+
+library:
+  source-dirs: src
+
+executables:
+  meerkat-exe:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -Wall
+    - -O
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - meerkat
+
+tests:
+  meerkat-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -Wall
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - meerkat

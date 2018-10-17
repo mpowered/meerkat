@@ -1,0 +1,74 @@
+-- This file has been generated from package.yaml by hpack version 0.28.2.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: 4f9113216bea11dc3866d8b62aabb73f5cd69e63ae976ae0a98a6879b96c079d
+
+name:           meerkat
+version:        0.1.0.0
+description:    Please see the README on GitHub at <https://github.com/bflyblue/meerkat#readme>
+homepage:       https://github.com/bflyblue/meerkat#readme
+bug-reports:    https://github.com/bflyblue/meerkat/issues
+author:         Shaun Sharples
+maintainer:     shaun.sharples@gmail.com
+copyright:      2018 Shaun Sharples
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+cabal-version:  >= 1.10
+extra-source-files:
+    ChangeLog.md
+    README.md
+
+source-repository head
+  type: git
+  location: https://github.com/bflyblue/meerkat
+
+library
+  exposed-modules:
+      Check.DiskSpaceUsage
+      Lib
+  other-modules:
+      Paths_meerkat
+  hs-source-dirs:
+      src
+  build-depends:
+      base >=4.7 && <5
+    , bytestring >=0.10.8.2 && <0.11
+    , megaparsec >=6.5.0 && <6.6
+    , text >=1.2.3 && <1.3
+    , typed-process >=0.2.3.0 && <0.3
+  default-language: Haskell2010
+
+executable meerkat-exe
+  main-is: Main.hs
+  other-modules:
+      Paths_meerkat
+  hs-source-dirs:
+      app
+  ghc-options: -Wall -O -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , bytestring >=0.10.8.2 && <0.11
+    , meerkat
+    , megaparsec >=6.5.0 && <6.6
+    , text >=1.2.3 && <1.3
+    , typed-process >=0.2.3.0 && <0.3
+  default-language: Haskell2010
+
+test-suite meerkat-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_meerkat
+  hs-source-dirs:
+      test
+  ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , bytestring >=0.10.8.2 && <0.11
+    , meerkat
+    , megaparsec >=6.5.0 && <6.6
+    , text >=1.2.3 && <1.3
+    , typed-process >=0.2.3.0 && <0.3
+  default-language: Haskell2010
