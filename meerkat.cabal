@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 9a9f05522b12a4b1fab820bcfbc8c12ac1d82d94a3a24f01b3ded583659dfc93
+-- hash: 703582aa866d666e6c825940a80484bc7192caf2ee68522840119e0d65ca5dd7
 
 name:           meerkat
 version:        0.1.0.0
@@ -33,10 +33,13 @@ library
       src
   build-depends:
       base >=4.7 && <5
+    , beam-core >=0.7.2.2 && <0.8
     , bytestring >=0.10.8.2 && <0.11
     , errors >=2.3.0 && <2.4
+    , hostname >=1.0 && <1.1
     , megaparsec >=6.5.0 && <6.6
     , text >=1.2.3 && <1.3
+    , time >=1.8.0.2 && <1.9
     , typed-process >=0.2.3.0 && <0.3
   default-language: Haskell2010
 
@@ -49,11 +52,14 @@ executable meerkat-exe
   ghc-options: -Wall -O -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
+    , beam-core >=0.7.2.2 && <0.8
     , bytestring >=0.10.8.2 && <0.11
     , errors >=2.3.0 && <2.4
+    , hostname >=1.0 && <1.1
     , meerkat
     , megaparsec >=6.5.0 && <6.6
     , text >=1.2.3 && <1.3
+    , time >=1.8.0.2 && <1.9
     , typed-process >=0.2.3.0 && <0.3
   default-language: Haskell2010
 
@@ -67,10 +73,13 @@ test-suite meerkat-test
   ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
+    , beam-core >=0.7.2.2 && <0.8
     , bytestring >=0.10.8.2 && <0.11
     , errors >=2.3.0 && <2.4
+    , hostname >=1.0 && <1.1
     , meerkat
     , megaparsec >=6.5.0 && <6.6
     , text >=1.2.3 && <1.3
+    , time >=1.8.0.2 && <1.9
     , typed-process >=0.2.3.0 && <0.3
   default-language: Haskell2010
