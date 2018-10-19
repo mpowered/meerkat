@@ -1,13 +1,11 @@
-{-# LANGUAGE DeriveAnyClass     #-}
-{-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE FlexibleContexts   #-}
 {-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE RecordWildCards    #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies       #-}
 
 module Check.DiskSpaceUsage
-  ( DiskSpaceUsage (..)
+  ( DiskSpaceUsage
+  , DiskSpaceUsageT (..)
   , freespace
   )
 where
@@ -17,33 +15,14 @@ import           Control.Error
 import           Control.Monad.IO.Class     (liftIO)
 import qualified Data.Char                  as Char
 import           Data.Text.Lazy             (Text)
-import qualified Data.Text.Lazy             as Text
 import qualified Data.Text.Lazy.Encoding    as Text
 import           Data.Time.Clock            (UTCTime)
 import           Data.Void                  (Void)
-import           Database.Beam
+import           Database
 import           System.Process.Typed       as Proc
 import qualified Text.Megaparsec            as M
 import qualified Text.Megaparsec.Char       as C
 import qualified Text.Megaparsec.Char.Lexer as L
-
-data DiskSpaceUsageT f = DiskSpaceUsageT
-  { timestamp   :: C f UTCTime
-  , host        :: C f Text
-  , source      :: C f Text
-  , fstype      :: C f Text
-  , size        :: C f Integer
-  , used        :: C f Integer
-  , avail       :: C f Integer
-  , target      :: C f Text
-  } deriving (Generic, Beamable)
-
-instance Table DiskSpaceUsageT where
-  data PrimaryKey DiskSpaceUsageT f = DiskSpaceUsageKey (C f UTCTime) (C f Text) (C f Text) deriving (Generic, Beamable)
-  primaryKey = DiskSpaceUsageKey <$> timestamp <*> host <*> target
-
-type DiskSpaceUsage = DiskSpaceUsageT Identity
-deriving instance Show DiskSpaceUsage
 
 type Parser = M.Parsec Void Text
 
@@ -85,5 +64,5 @@ freespace host timestamp = do
   (stdout, _stderr) <- liftIO $ Proc.readProcess_ df
   let txt = Text.decodeUtf8 stdout
   case M.parse (parser host timestamp) "" txt of
-    Left err     -> throwE (M.parseErrorPretty' txt err)
+    Left errmsg  -> throwE (M.parseErrorPretty' txt errmsg)
     Right usages -> return usages

@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 703582aa866d666e6c825940a80484bc7192caf2ee68522840119e0d65ca5dd7
+-- hash: fb8c5ad6ecaace37666278efae8f46fc8885b6a2dabd9062150223657508faaf
 
 name:           meerkat
 version:        0.1.0.0
@@ -27,17 +27,23 @@ source-repository head
 library
   exposed-modules:
       Check.DiskSpaceUsage
+      Database
   other-modules:
       Paths_meerkat
   hs-source-dirs:
       src
+  ghc-options: -Wall -O
   build-depends:
-      base >=4.7 && <5
+      async >=2.2.1 && <2.3
+    , base >=4.7 && <5
     , beam-core >=0.7.2.2 && <0.8
+    , beam-postgres >=0.3.2.2 && <0.4
     , bytestring >=0.10.8.2 && <0.11
     , errors >=2.3.0 && <2.4
     , hostname >=1.0 && <1.1
     , megaparsec >=6.5.0 && <6.6
+    , pqueue >=1.4.1.2 && <1.5
+    , stm >=2.4.5.1 && <2.5
     , text >=1.2.3 && <1.3
     , time >=1.8.0.2 && <1.9
     , typed-process >=0.2.3.0 && <0.3
@@ -51,13 +57,17 @@ executable meerkat-exe
       app
   ghc-options: -Wall -O -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      async >=2.2.1 && <2.3
+    , base >=4.7 && <5
     , beam-core >=0.7.2.2 && <0.8
+    , beam-postgres >=0.3.2.2 && <0.4
     , bytestring >=0.10.8.2 && <0.11
     , errors >=2.3.0 && <2.4
     , hostname >=1.0 && <1.1
     , meerkat
     , megaparsec >=6.5.0 && <6.6
+    , pqueue >=1.4.1.2 && <1.5
+    , stm >=2.4.5.1 && <2.5
     , text >=1.2.3 && <1.3
     , time >=1.8.0.2 && <1.9
     , typed-process >=0.2.3.0 && <0.3
@@ -70,15 +80,19 @@ test-suite meerkat-test
       Paths_meerkat
   hs-source-dirs:
       test
-  ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -Wall -O -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      async >=2.2.1 && <2.3
+    , base >=4.7 && <5
     , beam-core >=0.7.2.2 && <0.8
+    , beam-postgres >=0.3.2.2 && <0.4
     , bytestring >=0.10.8.2 && <0.11
     , errors >=2.3.0 && <2.4
     , hostname >=1.0 && <1.1
     , meerkat
     , megaparsec >=6.5.0 && <6.6
+    , pqueue >=1.4.1.2 && <1.5
+    , stm >=2.4.5.1 && <2.5
     , text >=1.2.3 && <1.3
     , time >=1.8.0.2 && <1.9
     , typed-process >=0.2.3.0 && <0.3
