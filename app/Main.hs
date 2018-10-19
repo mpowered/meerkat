@@ -1,7 +1,6 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
-{-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NumDecimals           #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
@@ -18,10 +17,8 @@ import           Data.Text.Lazy           as Text
 import           Data.Time.Clock
 import           Database
 import           Database.Beam
-import           Database.Beam.Schema.Tables
 import           Database.Beam.Backend.SQL.SQL92
 import qualified Database.Beam.Postgres   as Pg
-import qualified Database.Beam.Postgres.Syntax   as Pg
 import           Network.HostName         (getHostName)
 
 import           Check.DiskSpaceUsage
@@ -41,7 +38,7 @@ data Message m where
 type MessageQueue m = TBQueue (Message m)
 
 sendMessage :: MessageQueue m -> Message m -> STM ()
-sendMessage q = writeTBQueue q
+sendMessage = writeTBQueue
 
 recvMessage :: MessageQueue m -> STM (Message m)
 recvMessage = readTBQueue
@@ -79,7 +76,19 @@ dbLogger msgq =
           loop conn
         Shutdown -> return ()
 
-diskspace :: forall m. MessageQueue m -> Text -> IO ()
+type InsertValueSyntax cmd = Sql92ExpressionValueSyntax (Sql92InsertValuesExpressionSyntax (Sql92InsertValuesSyntax (Sql92InsertSyntax cmd)))
+
+diskspace
+  :: forall cmd be hdl m.
+     ( IsSql92Syntax cmd
+     , MonadBeam cmd be hdl m
+     , HasSqlValueSyntax (InsertValueSyntax cmd) Integer
+     , HasSqlValueSyntax (InsertValueSyntax cmd) Text
+     , HasSqlValueSyntax (InsertValueSyntax cmd) UTCTime
+     )
+  => MessageQueue m
+  -> Text
+  -> IO ()
 diskspace msgq hostname = do
   now <- getCurrentTime
   exceptT
@@ -129,7 +138,4 @@ scheduler queue = do
         threadDelay micro
 
     reschedule jobTime job =
-      let update =
-            let i = jobInterval job
-            in  PQueue.insert (addUTCTime i jobTime) job
-      in  update . PQueue.deleteMin
+      PQueue.insert (addUTCTime (jobInterval job) jobTime) job . PQueue.deleteMin
