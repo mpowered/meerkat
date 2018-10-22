@@ -14,7 +14,7 @@ import           Data.Time.Clock
 import           Database.Beam
 
 data DB f = DB
-  { diskSpaceUsage :: f (TableEntity DiskSpaceUsageT)
+  { dbDiskSpaceUsage :: f (TableEntity DiskSpaceUsageT)
   } deriving Generic
 
 instance Database be DB
@@ -23,7 +23,7 @@ db :: DatabaseSettings be DB
 db = defaultDbSettings
 
 data DiskSpaceUsageT f = DiskSpaceUsageT
-  { timestamp   :: C f UTCTime
+  { time        :: C f UTCTime
   , host        :: C f Text
   , source      :: C f Text
   , fstype      :: C f Text
@@ -35,7 +35,7 @@ data DiskSpaceUsageT f = DiskSpaceUsageT
 
 instance Table DiskSpaceUsageT where
   data PrimaryKey DiskSpaceUsageT f = DiskSpaceUsageKey (C f UTCTime) (C f Text) (C f Text) deriving (Generic, Beamable)
-  primaryKey = DiskSpaceUsageKey <$> timestamp <*> host <*> target
+  primaryKey = DiskSpaceUsageKey <$> time <*> host <*> target
 
 type DiskSpaceUsage = DiskSpaceUsageT Identity
 deriving instance Show DiskSpaceUsage

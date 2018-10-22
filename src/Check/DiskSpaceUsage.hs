@@ -39,7 +39,7 @@ str :: Parser Text
 str = lexeme $ M.takeWhileP (Just "string") (not . Char.isSpace)
 
 usage :: Text -> UTCTime -> Parser DiskSpaceUsage
-usage host timestamp = do
+usage host time = do
   source <- str
   fstype <- str
   size   <- int
@@ -49,8 +49,8 @@ usage host timestamp = do
   return DiskSpaceUsageT {..}
 
 parser :: Text -> UTCTime -> Parser [DiskSpaceUsage]
-parser host timestamp =
-  M.manyTill C.anyChar C.eol *> M.many (usage host timestamp) <* M.eof
+parser host time =
+  M.manyTill C.anyChar C.eol *> M.many (usage host time) <* M.eof
 
 df :: ProcessConfig () () ()
 df = proc "df" args

@@ -60,8 +60,9 @@ dbLogger msgq =
   bracket
    ( Pg.connect
       Pg.defaultConnectInfo
-        { Pg.connectHost = "localhost"
-        , Pg.connectUser = "shaun"
+        { Pg.connectHost = "10.0.0.8"
+        , Pg.connectUser = "tsdb"
+        , Pg.connectPassword = "tsdb"
         , Pg.connectDatabase = "tsdb"
         }
     )
@@ -97,7 +98,7 @@ diskspace msgq hostname = do
     (freespace hostname now)
   where
     insertAction :: [DiskSpaceUsage] -> m ()
-    insertAction = runInsert . insert (diskSpaceUsage db) . insertValues
+    insertAction = runInsert . insert (dbDiskSpaceUsage db) . insertValues
 
 scheduler :: JobQueue -> IO ()
 scheduler queue = do
