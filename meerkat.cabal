@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: fb8c5ad6ecaace37666278efae8f46fc8885b6a2dabd9062150223657508faaf
+-- hash: b35d3fefa9e5f5862b089beaacd2051c34b458735f81a6d40cd3ac97734ab7c3
 
 name:           meerkat
 version:        0.1.0.0
@@ -41,6 +41,7 @@ library
     , bytestring >=0.10.8.2 && <0.11
     , errors >=2.3.0 && <2.4
     , hostname >=1.0 && <1.1
+    , logging >=3.0.5 && <3.1
     , megaparsec >=6.5.0 && <6.6
     , pqueue >=1.4.1.2 && <1.5
     , stm >=2.4.5.1 && <2.5
@@ -64,6 +65,7 @@ executable meerkat-exe
     , bytestring >=0.10.8.2 && <0.11
     , errors >=2.3.0 && <2.4
     , hostname >=1.0 && <1.1
+    , logging >=3.0.5 && <3.1
     , meerkat
     , megaparsec >=6.5.0 && <6.6
     , pqueue >=1.4.1.2 && <1.5
@@ -89,6 +91,7 @@ test-suite meerkat-test
     , bytestring >=0.10.8.2 && <0.11
     , errors >=2.3.0 && <2.4
     , hostname >=1.0 && <1.1
+    , logging >=3.0.5 && <3.1
     , meerkat
     , megaparsec >=6.5.0 && <6.6
     , pqueue >=1.4.1.2 && <1.5

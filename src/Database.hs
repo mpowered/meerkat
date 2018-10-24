@@ -9,7 +9,7 @@
 
 module Database where
 
-import           Data.Text.Lazy           as Text
+import           Data.Text                as Text
 import           Data.Time.Clock
 import           Database.Beam
 

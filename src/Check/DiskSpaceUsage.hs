@@ -14,7 +14,8 @@ import           Control.Applicative        (empty)
 import           Control.Error
 import           Control.Monad.IO.Class     (liftIO)
 import qualified Data.Char                  as Char
-import           Data.Text.Lazy             (Text)
+import qualified Data.Text                  as Text
+import qualified Data.Text.Lazy             as LText
 import qualified Data.Text.Lazy.Encoding    as Text
 import           Data.Time.Clock            (UTCTime)
 import           Data.Void                  (Void)
@@ -24,7 +25,7 @@ import qualified Text.Megaparsec            as M
 import qualified Text.Megaparsec.Char       as C
 import qualified Text.Megaparsec.Char.Lexer as L
 
-type Parser = M.Parsec Void Text
+type Parser = M.Parsec Void LText.Text
 
 sc :: Parser ()
 sc = L.space C.space1 empty empty
@@ -35,10 +36,10 @@ lexeme = L.lexeme sc
 int :: Parser Integer
 int = lexeme L.decimal
 
-str :: Parser Text
-str = lexeme $ M.takeWhileP (Just "string") (not . Char.isSpace)
+str :: Parser Text.Text
+str = LText.toStrict <$> lexeme (M.takeWhileP (Just "string") (not . Char.isSpace))
 
-usage :: Text -> UTCTime -> Parser DiskSpaceUsage
+usage :: Text.Text -> UTCTime -> Parser DiskSpaceUsage
 usage host time = do
   source <- str
   fstype <- str
@@ -48,7 +49,7 @@ usage host time = do
   target <- str
   return DiskSpaceUsageT {..}
 
-parser :: Text -> UTCTime -> Parser [DiskSpaceUsage]
+parser :: Text.Text -> UTCTime -> Parser [DiskSpaceUsage]
 parser host time =
   M.manyTill C.anyChar C.eol *> M.many (usage host time) <* M.eof
 
@@ -59,7 +60,7 @@ df = proc "df" args
     exclusions = concatMap exclude ["tmpfs", "devtmpfs"]
     exclude e = ["-x", e]
 
-freespace :: Text -> UTCTime -> ExceptT String IO [DiskSpaceUsage]
+freespace :: Text.Text -> UTCTime -> ExceptT String IO [DiskSpaceUsage]
 freespace host timestamp = do
   (stdout, _stderr) <- liftIO $ Proc.readProcess_ df
   let txt = Text.decodeUtf8 stdout

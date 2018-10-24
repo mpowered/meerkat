@@ -3,3 +3,4 @@ packages:
 - .
 extra-deps:
 - beam-postgres-0.3.2.2
+- logging-3.0.5

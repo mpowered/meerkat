@@ -3,6 +3,8 @@
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NumDecimals           #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 
 module Main where
@@ -12,8 +14,10 @@ import           Control.Concurrent.Async
 import           Control.Concurrent.STM
 import           Control.Error
 import           Control.Exception        (bracket)
+import qualified Control.Logging          as Log
+import           Control.Monad
 import qualified Data.PQueue.Prio.Min     as PQueue
-import           Data.Text.Lazy           as Text
+import qualified Data.Text                as Text
 import           Data.Time.Clock
 import           Database
 import           Database.Beam
@@ -24,12 +28,40 @@ import           Network.HostName         (getHostName)
 import           Check.DiskSpaceUsage
 
 data Job = Job
-  { jobAction   :: IO ()
-  , jobInterval :: NominalDiffTime
-  , jobLast     :: Maybe (Async ())
+  { jobDescription  :: Text.Text
+  , jobAction       :: IO ()
+  , jobInterval     :: Maybe NominalDiffTime
+  , jobResult       :: MVar Bool
   }
 
+newPeriodicJob :: Text.Text -> IO () -> NominalDiffTime -> IO Job
+newPeriodicJob desc action interval = do
+  result <- newMVar True
+  return
+    Job { jobDescription  = desc
+        , jobAction       = action
+        , jobInterval     = Just interval
+        , jobResult       = result
+        }
+
+newStreamingJob :: Text.Text -> IO () -> IO Job
+newStreamingJob desc action = do
+  result <- newMVar True
+  return
+    Job { jobDescription  = desc
+        , jobAction       = action
+        , jobInterval     = Nothing
+        , jobResult       = result
+        }
+
 type JobQueue = PQueue.MinPQueue UTCTime Job
+
+data Running = Running (Async ()) (MVar Bool)
+
+data Scheduler = Scheduler
+  { queue   :: JobQueue
+  , running :: [Running]
+  }
 
 data Message m where
   SampleData :: m () -> Message m
@@ -44,14 +76,21 @@ recvMessage :: MessageQueue m -> STM (Message m)
 recvMessage = readTBQueue
 
 main :: IO ()
-main = do
+main = Log.withStdoutLogging $ do
   msgq <- atomically $ newTBQueue 1000
-  hostname  <- Text.pack <$> getHostName
+  hostname <- Text.pack <$> getHostName
   now <- getCurrentTime
-  let job = Job (diskspace msgq hostname) 60 Nothing
-      queue = PQueue.fromList [ (now, job) ]
+  Log.log $ Text.unwords
+    [ "Meerkat started on"
+    , hostname
+    , "at"
+    , showTxt now
+    ]
+
+  job <- newPeriodicJob "Check disk space usage" (diskspace msgq hostname) 10
+  let queue = PQueue.fromList [ (now, job) ]
   _ <- forkIO $ dbLogger msgq
-  scheduler queue
+  runScheduler (Scheduler queue [])
 
 dbLogger
   :: MessageQueue Pg.Pg
@@ -73,7 +112,7 @@ dbLogger msgq =
       msg <- atomically $ recvMessage msgq
       case msg of
         SampleData insertAction -> do
-          Pg.runBeamPostgresDebug putStrLn conn insertAction
+          Pg.runBeamPostgresDebug (Log.debug . Text.pack) conn insertAction
           loop conn
         Shutdown -> return ()
 
@@ -84,11 +123,11 @@ diskspace
      ( IsSql92Syntax cmd
      , MonadBeam cmd be hdl m
      , HasSqlValueSyntax (InsertValueSyntax cmd) Integer
-     , HasSqlValueSyntax (InsertValueSyntax cmd) Text
+     , HasSqlValueSyntax (InsertValueSyntax cmd) Text.Text
      , HasSqlValueSyntax (InsertValueSyntax cmd) UTCTime
      )
   => MessageQueue m
-  -> Text
+  -> Text.Text
   -> IO ()
 diskspace msgq hostname = do
   now <- getCurrentTime
@@ -100,43 +139,87 @@ diskspace msgq hostname = do
     insertAction :: [DiskSpaceUsage] -> m ()
     insertAction = runInsert . insert (dbDiskSpaceUsage db) . insertValues
 
-scheduler :: JobQueue -> IO ()
-scheduler queue = do
+runScheduler :: Scheduler -> IO ()
+runScheduler scheduler = do
+  (scheduler', delay) <- schedule scheduler
+  unless (nothingScheduled scheduler') $ do
+    let maxDelay = if null (running scheduler') then 10 else 1
+    sleep maxDelay delay
+    runScheduler scheduler'
+  where
+    sleep maxDelay t
+      | t <= 0 = return ()
+      | otherwise = threadDelay $ ceiling (min t maxDelay * 1e6)
+          -- Log.log $ "Sleep " <> showTxt t <> ", max " <> showTxt maxDelay
+
+nothingScheduled :: Scheduler -> Bool
+nothingScheduled Scheduler {..} =
+  PQueue.null queue && null running
+
+schedule :: Scheduler -> IO (Scheduler, NominalDiffTime)
+schedule s = do
   now <- getCurrentTime
+  reap s >>= sow now
+
+-- Check to see if any running jobs have completed and
+-- 1) write their results to the result MVar
+-- 2) remove them from the running set
+reap :: Scheduler -> IO Scheduler
+reap Scheduler {..} = do
+  running' <- concat <$> mapM reaper running
+  return Scheduler { running = running', .. }
+  where
+    reaper (Running a mvar) = do
+      result <- poll a
+      case result of
+        Nothing ->
+          return [Running a mvar]
+        Just (Left e) -> do
+          Log.log $ "Job raised exception: " <> showTxt e
+          putMVar mvar False
+          return []
+        Just (Right ()) -> do
+          Log.log "Job completed"
+          putMVar mvar True
+          return []
+
+-- Check job queue for new jobs that are ready to run.
+sow :: UTCTime -> Scheduler -> IO (Scheduler, NominalDiffTime)
+sow now s@Scheduler {..} =
   case PQueue.getMin queue of
-    Nothing -> return ()
+    Nothing -> return (s, 0)
     Just (jobTime, job) ->
       if now < jobTime
-      then do
-        sleep (diffUTCTime jobTime now)
-        scheduler queue
-      else do
-        job' <- startJob job
-        scheduler (reschedule jobTime job' queue)
-  where
-    startJob job =
-      case jobLast job of
-        Nothing -> do
-          a' <- async $ jobAction job
-          return job { jobLast = Just a' }
-        Just a -> do
-          ap <- poll a
-          case ap of
-            Nothing -> do
-              putStrLn "Skipping job, previous instance still busy"
-              return job
-            Just (Left e) -> do
-              putStrLn $ "Previous job raised exception: " ++ show e
-              return job
-            Just (Right ()) -> do
-              a' <- async $ jobAction job
-              return job { jobLast = Just a' }
-    sleep t
-      | t < 0 = return ()
-      | otherwise = do
-        -- cap sleep to some maximum (sometimes local clock can jump)
-        let micro = if t > 10 then 10e6 else ceiling (t * 1e6)
-        threadDelay micro
+      then
+        return (s, diffUTCTime jobTime now)
+      else
+        start s jobTime job >>= sow now
 
-    reschedule jobTime job =
-      PQueue.insert (addUTCTime (jobInterval job) jobTime) job . PQueue.deleteMin
+-- Attempt to start a job if it's not already running, and add it to the
+-- running set.
+start :: Scheduler -> UTCTime -> Job -> IO Scheduler
+start s@Scheduler {..} jobTime job = do
+  Log.log $ "Starting: " <> jobDescription job <> " scheduled for " <> showTxt jobTime
+  result <- tryTakeMVar (jobResult job)
+  s' <- case result of
+    Nothing -> do
+      Log.log "Skipping job, previous instance still busy"
+      return s
+    Just _ -> do
+      a <- async $ jobAction job
+      return s { running = Running a (jobResult job) : running }
+  return s' { queue = reschedule jobTime job queue }
+
+-- Reschedule the job on the top of the jobqueue
+-- 1) Remove it from the top
+-- 2) Add it at back at jobTime + jobInterval if one is set
+reschedule :: UTCTime -> Job -> JobQueue -> JobQueue
+reschedule jobTime job =
+  case jobInterval job of
+    Just interval ->
+      PQueue.insert (addUTCTime interval jobTime) job . PQueue.deleteMin
+    Nothing ->
+      PQueue.deleteMin
+
+showTxt :: Show a => a -> Text.Text
+showTxt = Text.pack . show
