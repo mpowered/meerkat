@@ -89,7 +89,7 @@ main = Log.withStdoutLogging $ do
     ]
 
   df <- newPeriodicJob "Check disk space usage" (diskspace msgq hostname) 10
-  pidstat <- newPeriodicJob "Check disk space usage" (pidstats hostname) 10
+  pidstat <- newPeriodicJob "Check process statistics" (pidstats hostname) 10
   let queue = PQueue.fromList [ (now, df), (now, pidstat) ]
   _ <- forkIO $ dbLogger msgq
   runScheduler (Scheduler queue [])
@@ -145,7 +145,10 @@ pidstats
   :: Text.Text
   -> IO ()
 pidstats hostname =
-  print =<< runExceptT (processes hostname)
+  exceptT
+    putStrLn
+    print
+    (processes hostname)
 
 runScheduler :: Scheduler -> IO ()
 runScheduler scheduler = do

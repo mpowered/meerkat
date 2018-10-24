@@ -10,11 +10,12 @@ module Check.ProcessStatistics
   )
 where
 
-import           Control.Applicative        (empty)
+import           Control.Applicative
 import           Control.Error
 import           Control.Monad
 import           Control.Monad.IO.Class     (liftIO)
 import qualified Data.Char                  as Char
+import           Data.Functor
 import           Data.Scientific
 import qualified Data.Text                  as Text
 import qualified Data.Text.Lazy             as LText
@@ -37,7 +38,10 @@ import qualified Text.Megaparsec.Char.Lexer as L
 type Parser = M.Parsec Void LText.Text
 
 sc :: Parser ()
-sc = L.space C.space1 empty empty
+sc = L.space space1 empty empty
+
+space1 :: Parser ()
+space1 = M.skipSome (M.label "whitespace" $ C.oneOf [' ', '\t'])
 
 lexeme :: Parser a -> Parser a
 lexeme = L.lexeme sc
@@ -52,7 +56,12 @@ sci :: Parser Scientific
 sci = lexeme (L.signed sc L.scientific)
 
 str :: Parser Text.Text
-str = LText.toStrict <$> lexeme (M.takeWhileP (Just "string") (not . Char.isSpace))
+str = LText.toStrict <$> lexeme (M.takeWhile1P (Just "string") (not . Char.isSpace))
+
+utctime :: Parser UTCTime
+utctime = do
+  timestr <- Text.unwords <$> M.count 2 str
+  parseTimeM False defaultTimeLocale "%r" (Text.unpack timestr)
 
 header :: Parser [Text.Text]
 header = symbol "#" *> M.many str
@@ -67,8 +76,8 @@ pidstats fields host = do
   return stats
 
   where
-    field ps "Time"     = (\x -> ps { psTime = x }) <$> (parseTimeM False defaultTimeLocale "fmt" =<< Text.unpack <$> str)
-    field ps "Command"  = (\x -> ps { psCommand = x }) <$> str
+    field ps "Time"     = (\x -> ps { psTime = x }) <$> utctime
+    field ps "Command"  = (\x -> ps { psCommand = Text.unwords x }) <$> many str
     field ps "%CPU"     = (\x -> ps { psCpu = Just x }) <$> sci
     field ps "%usr"     = (\x -> ps { psUserCpu = Just x }) <$> sci
     field ps "%system"  = (\x -> ps { psSysCpu = Just x }) <$> sci
@@ -77,7 +86,7 @@ pidstats fields host = do
     field ps "VSZ"      = (\x -> ps { psVirtualMem = Just x }) <$> int
     field ps "RSS"      = (\x -> ps { psResidentMem = Just x }) <$> int
     field ps "%MEM"     = (\x -> ps { psMem = Just x }) <$> sci
-    field ps _          = return ps
+    field ps _          = ps <$ str
 
     blank =
       ProcessStatsT
@@ -94,24 +103,37 @@ pidstats fields host = do
         , psMem         = Nothing
         }
 
+data Line
+  = Header [Text.Text]
+  | Stats ProcessStats
+  | Preamble
+  | EOF
+
+line :: Text.Text -> [Text.Text] -> Parser Line
+line host headers = (EOF <$ M.eof)
+                <|> (Header <$> header <* C.eol)
+                <|> (Stats <$> pidstats headers host <* C.eol)
+
+preamble :: Parser Line
+preamble = (EOF <$ M.eof)
+       <|> (Header <$> header <* C.eol)
+       <|> (Preamble <$ M.label "preamble" (M.many str) <* C.eol)
+
 parser :: Text.Text -> Parser [ProcessStats]
 parser host = go []
   where
-    go [] = do
-      line <- M.eitherP header (M.skipMany str) <* C.eol
-      case line of
-        Left headers' -> go headers'
-        Right () -> go []
     go headers = do
-      line <- M.eitherP header (pidstats headers host) <* C.eol
-      case line of
-        Left headers' -> go headers'
-        Right stats -> do
-          stats' <- go headers
-          return (stats : stats')
+      l <- if null headers then preamble else line host headers
+      case l of
+        EOF -> return []
+        Header h -> go h
+        Stats ps -> do
+          ps' <- go headers
+          return (ps : ps')
+        Preamble -> go headers
 
 pidstat :: ProcessConfig () () ()
-pidstat = proc "pidstat" ["1", "1", "-druh"]
+pidstat = proc "pidstat" ["1", "1", "-druhl"]
 
 processes :: Text.Text -> ExceptT String IO [ProcessStats]
 processes host = do

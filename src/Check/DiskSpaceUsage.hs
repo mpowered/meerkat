@@ -37,7 +37,7 @@ int :: Parser Integer
 int = lexeme L.decimal
 
 str :: Parser Text.Text
-str = LText.toStrict <$> lexeme (M.takeWhileP (Just "string") (not . Char.isSpace))
+str = LText.toStrict <$> lexeme (M.takeWhile1P (Just "string") (not . Char.isSpace))
 
 usage :: Text.Text -> UTCTime -> Parser DiskSpaceUsage
 usage duHost duTime = do
