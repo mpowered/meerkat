@@ -40,13 +40,13 @@ str :: Parser Text.Text
 str = LText.toStrict <$> lexeme (M.takeWhileP (Just "string") (not . Char.isSpace))
 
 usage :: Text.Text -> UTCTime -> Parser DiskSpaceUsage
-usage host time = do
-  source <- str
-  fstype <- str
-  size   <- int
-  used   <- int
-  avail  <- int
-  target <- str
+usage duHost duTime = do
+  duSource <- str
+  duFstype <- str
+  duSize   <- int
+  duUsed   <- int
+  duAvail  <- int
+  duTarget <- str
   return DiskSpaceUsageT {..}
 
 parser :: Text.Text -> UTCTime -> Parser [DiskSpaceUsage]

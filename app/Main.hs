@@ -26,6 +26,7 @@ import qualified Database.Beam.Postgres   as Pg
 import           Network.HostName         (getHostName)
 
 import           Check.DiskSpaceUsage
+import           Check.ProcessStatistics
 
 data Job = Job
   { jobDescription  :: Text.Text
@@ -87,8 +88,9 @@ main = Log.withStdoutLogging $ do
     , showTxt now
     ]
 
-  job <- newPeriodicJob "Check disk space usage" (diskspace msgq hostname) 10
-  let queue = PQueue.fromList [ (now, job) ]
+  df <- newPeriodicJob "Check disk space usage" (diskspace msgq hostname) 10
+  pidstat <- newPeriodicJob "Check disk space usage" (pidstats hostname) 10
+  let queue = PQueue.fromList [ (now, df), (now, pidstat) ]
   _ <- forkIO $ dbLogger msgq
   runScheduler (Scheduler queue [])
 
@@ -138,6 +140,12 @@ diskspace msgq hostname = do
   where
     insertAction :: [DiskSpaceUsage] -> m ()
     insertAction = runInsert . insert (dbDiskSpaceUsage db) . insertValues
+
+pidstats
+  :: Text.Text
+  -> IO ()
+pidstats hostname =
+  print =<< runExceptT (processes hostname)
 
 runScheduler :: Scheduler -> IO ()
 runScheduler scheduler = do

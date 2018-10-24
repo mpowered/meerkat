@@ -9,12 +9,14 @@
 
 module Database where
 
+import           Data.Scientific
 import           Data.Text                as Text
 import           Data.Time.Clock
 import           Database.Beam
 
 data DB f = DB
   { dbDiskSpaceUsage :: f (TableEntity DiskSpaceUsageT)
+  , dbProcessStats   :: f (TableEntity ProcessStatsT)
   } deriving Generic
 
 instance Database be DB
@@ -23,19 +25,40 @@ db :: DatabaseSettings be DB
 db = defaultDbSettings
 
 data DiskSpaceUsageT f = DiskSpaceUsageT
-  { time        :: C f UTCTime
-  , host        :: C f Text
-  , source      :: C f Text
-  , fstype      :: C f Text
-  , size        :: C f Integer
-  , used        :: C f Integer
-  , avail       :: C f Integer
-  , target      :: C f Text
+  { duTime        :: C f UTCTime
+  , duHost        :: C f Text
+  , duSource      :: C f Text
+  , duFstype      :: C f Text
+  , duSize        :: C f Integer
+  , duUsed        :: C f Integer
+  , duAvail       :: C f Integer
+  , duTarget      :: C f Text
   } deriving (Generic, Beamable)
 
 instance Table DiskSpaceUsageT where
   data PrimaryKey DiskSpaceUsageT f = DiskSpaceUsageKey (C f UTCTime) (C f Text) (C f Text) deriving (Generic, Beamable)
-  primaryKey = DiskSpaceUsageKey <$> time <*> host <*> target
+  primaryKey = DiskSpaceUsageKey <$> duTime <*> duHost <*> duTarget
 
 type DiskSpaceUsage = DiskSpaceUsageT Identity
 deriving instance Show DiskSpaceUsage
+
+data ProcessStatsT f = ProcessStatsT
+  { psTime        :: C f UTCTime
+  , psHost        :: C f Text
+  , psCommand     :: C f Text
+  , psCpu         :: C f (Maybe Scientific)
+  , psUserCpu     :: C f (Maybe Scientific)
+  , psSysCpu      :: C f (Maybe Scientific)
+  , psGuestCpu    :: C f (Maybe Scientific)
+  , psWaitCpu     :: C f (Maybe Scientific)
+  , psVirtualMem  :: C f (Maybe Integer)
+  , psResidentMem :: C f (Maybe Integer)
+  , psMem         :: C f (Maybe Scientific)
+  } deriving (Generic, Beamable)
+
+instance Table ProcessStatsT where
+  data PrimaryKey ProcessStatsT f = ProcessStatsKey (C f UTCTime) (C f Text) (C f Text) deriving (Generic, Beamable)
+  primaryKey = ProcessStatsKey <$> psTime <*> psHost <*> psCommand
+
+type ProcessStats = ProcessStatsT Identity
+deriving instance Show ProcessStats

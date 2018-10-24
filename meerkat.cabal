@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: b35d3fefa9e5f5862b089beaacd2051c34b458735f81a6d40cd3ac97734ab7c3
+-- hash: f881a83bc82d120ecb0a6b53842e4b8648e11404d1268b44327604784355dfa7
 
 name:           meerkat
 version:        0.1.0.0
@@ -27,6 +27,7 @@ source-repository head
 library
   exposed-modules:
       Check.DiskSpaceUsage
+      Check.ProcessStatistics
       Database
   other-modules:
       Paths_meerkat
@@ -44,6 +45,7 @@ library
     , logging >=3.0.5 && <3.1
     , megaparsec >=6.5.0 && <6.6
     , pqueue >=1.4.1.2 && <1.5
+    , scientific >=0.3.6.2 && <0.4
     , stm >=2.4.5.1 && <2.5
     , text >=1.2.3 && <1.3
     , time >=1.8.0.2 && <1.9
@@ -69,6 +71,7 @@ executable meerkat-exe
     , meerkat
     , megaparsec >=6.5.0 && <6.6
     , pqueue >=1.4.1.2 && <1.5
+    , scientific >=0.3.6.2 && <0.4
     , stm >=2.4.5.1 && <2.5
     , text >=1.2.3 && <1.3
     , time >=1.8.0.2 && <1.9
@@ -95,6 +98,7 @@ test-suite meerkat-test
     , meerkat
     , megaparsec >=6.5.0 && <6.6
     , pqueue >=1.4.1.2 && <1.5
+    , scientific >=0.3.6.2 && <0.4
     , stm >=2.4.5.1 && <2.5
     , text >=1.2.3 && <1.3
     , time >=1.8.0.2 && <1.9
