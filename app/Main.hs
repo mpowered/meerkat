@@ -17,6 +17,7 @@ import           Control.Exception        (bracket)
 import qualified Control.Logging          as Log
 import           Control.Monad
 import qualified Data.PQueue.Prio.Min     as PQueue
+import           Data.Scientific
 import qualified Data.Text                as Text
 import           Data.Time.Clock
 import           Database
@@ -89,8 +90,14 @@ main = Log.withStdoutLogging $ do
     ]
 
   df <- newPeriodicJob "Check disk space usage" (diskspace msgq hostname) 10
-  pidstat <- newPeriodicJob "Check disk space usage" (pidstats hostname) 10
-  let queue = PQueue.fromList [ (now, df), (now, pidstat) ]
+  pidstat <- newPeriodicJob "Check disk space usage" (pidstats msgq hostname) 120
+  let queue = PQueue.fromList
+                [ (now, df)
+                -- run two instances of pidstat, each triggered every 2 mins
+                -- each one is expected to collect stats for 1 minute
+                , (now, pidstat)
+                , (addUTCTime 60 now, pidstat)
+                ]
   _ <- forkIO $ dbLogger msgq
   runScheduler (Scheduler queue [])
 
@@ -142,10 +149,25 @@ diskspace msgq hostname = do
     insertAction = runInsert . insert (dbDiskSpaceUsage db) . insertValues
 
 pidstats
-  :: Text.Text
+  :: forall cmd be hdl m.
+     ( IsSql92Syntax cmd
+     , MonadBeam cmd be hdl m
+     , HasSqlValueSyntax (InsertValueSyntax cmd) (Maybe Integer)
+     , HasSqlValueSyntax (InsertValueSyntax cmd) Text.Text
+     , HasSqlValueSyntax (InsertValueSyntax cmd) (Maybe Scientific)
+     , HasSqlValueSyntax (InsertValueSyntax cmd) UTCTime
+     )
+  => MessageQueue m
+  -> Text.Text
   -> IO ()
-pidstats hostname =
-  print =<< runExceptT (processes hostname)
+pidstats msgq hostname =
+  exceptT
+    print
+    (atomically . sendMessage msgq . SampleData . insertAction)
+    (processes hostname)
+  where
+    insertAction :: [ProcessStats] -> m ()
+    insertAction = runInsert . insert (dbProcessStats db) . insertValues
 
 runScheduler :: Scheduler -> IO ()
 runScheduler scheduler = do
