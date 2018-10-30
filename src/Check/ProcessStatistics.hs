@@ -20,6 +20,7 @@ import qualified Data.Text                  as Text
 import qualified Data.Text.Lazy             as LText
 import qualified Data.Text.Lazy.Encoding    as Text
 import           Data.Time.Clock            (UTCTime (..), getCurrentTime)
+import           Data.Time.Format           (parseTimeM, defaultTimeLocale)
 import           Data.Void                  (Void)
 import           Database
 import           System.Process.Typed       as Proc
@@ -55,10 +56,10 @@ sci = lexeme (L.signed sc L.scientific)
 str :: Parser Text.Text
 str = LText.toStrict <$> lexeme (M.takeWhile1P (Just "string") (not . Char.isSpace))
 
--- utctime :: Parser UTCTime
--- utctime = do
---   timestr <- Text.unwords <$> M.count 2 str
---   parseTimeM False defaultTimeLocale "%r" (Text.unpack timestr)
+utctime :: Parser UTCTime
+utctime = do
+  timestr <- Text.unwords <$> M.count 2 str
+  parseTimeM False defaultTimeLocale "%r" (Text.unpack timestr)
 
 header :: Parser [Text.Text]
 header = symbol "#" *> M.many str
@@ -66,14 +67,12 @@ header = symbol "#" *> M.many str
 pidstats :: [Text.Text] -> Text.Text -> UTCTime -> Parser ProcessStats
 pidstats fields host timestamp = do
   stats <- foldM field blank fields
-  when (psTime stats == psTime blank) $
-    fail "Unable to find time when parsing process statistics"
   when (psCommand stats == psCommand blank) $
     fail "Unable to find command when parsing process statistics"
   return stats
 
   where
-    -- field ps "Time"     = (\x -> ps { psTime = x }) <$> utctime
+    field ps "Time"     = ps <$ utctime
     field ps "Command"  = (\x -> ps { psCommand = Text.unwords x }) <$> many str
     field ps "%CPU"     = (\x -> ps { psCpu = Just x }) <$> sci
     field ps "%usr"     = (\x -> ps { psUserCpu = Just x }) <$> sci

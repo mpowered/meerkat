@@ -89,14 +89,15 @@ main = Log.withStdoutLogging $ do
     , showTxt now
     ]
 
-  df <- newPeriodicJob "Check disk space usage" (diskspace msgq hostname) 10
-  pidstat <- newPeriodicJob "Check disk space usage" (pidstats msgq hostname) 120
+  df <- newPeriodicJob "Check disk space usage" (diskspace msgq hostname) 60
+  pidstat1 <- newPeriodicJob "Check process statistics" (pidstats msgq hostname) 120
+  pidstat2 <- newPeriodicJob "Check process statistics" (pidstats msgq hostname) 120
   let queue = PQueue.fromList
                 [ (now, df)
                 -- run two instances of pidstat, each triggered every 2 mins
                 -- each one is expected to collect stats for 1 minute
-                , (now, pidstat)
-                , (addUTCTime 60 now, pidstat)
+                , (now, pidstat1)
+                , (addUTCTime 60 now, pidstat2)
                 ]
   _ <- forkIO $ dbLogger msgq
   runScheduler (Scheduler queue [])
