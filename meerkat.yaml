@@ -1,0 +1,5 @@
+host: neptune
+logging:
+  logfile: "meerkat.log"
+  loglevel: debug
+dff: df

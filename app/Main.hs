@@ -20,6 +20,7 @@ import qualified Data.PQueue.Prio.Min     as PQueue
 import           Data.Scientific
 import qualified Data.Text                as Text
 import           Data.Time.Clock
+import           Data.Yaml
 import           Database
 import           Database.Beam
 import           Database.Beam.Backend.SQL.SQL92
@@ -29,6 +30,42 @@ import           Network.HostName         (getHostName)
 import           Check.DiskSpaceUsage
 import           Check.MemoryUsage
 import           Check.ProcessStatistics
+
+data Config = Config
+  { cfgHostname     :: Maybe Text.Text
+  , cfgLogging      :: LogConfig
+  }
+
+data LogConfig = LogConfig
+  { cfgLogFile      :: Maybe FilePath
+  , cfgLogLevel     :: Log.LogLevel
+  }
+
+defaultLogConfig :: LogConfig
+defaultLogConfig = LogConfig Nothing Log.LevelInfo
+
+instance FromJSON Config where
+  parseJSON = withObject "Config" parseConfig
+    where
+      parseConfig o = Config
+        <$> o .:? "hostname"
+        <*> o .:? "logging" .!= defaultLogConfig
+
+instance FromJSON LogConfig where
+  parseJSON = withObject "LogConfig" parseLogConfig
+    where
+      parseLogConfig o = LogConfig
+        <$> o .:? "logfile"  .!= cfgLogFile defaultLogConfig
+        <*> o .:? "loglevel" .!= cfgLogLevel defaultLogConfig
+
+instance FromJSON Log.LogLevel where
+  parseJSON = withText "LogLevel" parseLogLevel
+    where
+      parseLogLevel "debug" = return Log.LevelDebug
+      parseLogLevel "info"  = return Log.LevelInfo
+      parseLogLevel "warn"  = return Log.LevelWarn
+      parseLogLevel "error" = return Log.LevelError
+      parseLogLevel txt     = fail $ "'" <> Text.unpack txt <> "' is not a valid log level"
 
 data Job = Job
   { jobDescription  :: Text.Text
@@ -79,9 +116,22 @@ recvMessage :: MessageQueue m -> STM (Message m)
 recvMessage = readTBQueue
 
 main :: IO ()
-main = Log.withStdoutLogging $ do
+main = decodeFileEither "meerkat.yaml" >>= either parseError runApp
+  where
+    parseError e = do
+      putStrLn "Unable to parse configuration file"
+      putStrLn $ prettyPrintParseException e
+
+    runApp cfg@Config{..} = do
+      let withLogging = maybe Log.withStdoutLogging Log.withFileLogging (cfgLogFile cfgLogging)
+      withLogging $ do
+        Log.setLogLevel (cfgLogLevel cfgLogging)
+        app cfg
+
+app :: Config -> IO ()
+app Config{..} = do
   msgq <- atomically $ newTBQueue 1000
-  hostname <- Text.pack <$> getHostName
+  hostname <- maybe (Text.pack <$> getHostName) return cfgHostname
   now <- getCurrentTime
   Log.log $ Text.unwords
     [ "Meerkat started on"
@@ -92,15 +142,15 @@ main = Log.withStdoutLogging $ do
 
   df <- newPeriodicJob "Check disk space usage" (diskspace msgq hostname) 60
   mem <- newPeriodicJob "Check memory usage" (memory msgq hostname) 60
-  -- pidstat1 <- newPeriodicJob "Check process statistics" (pidstats msgq hostname) 120
-  -- pidstat2 <- newPeriodicJob "Check process statistics" (pidstats msgq hostname) 120
+  pidstat1 <- newPeriodicJob "Check process statistics" (pidstats msgq hostname) 120
+  pidstat2 <- newPeriodicJob "Check process statistics" (pidstats msgq hostname) 120
   let queue = PQueue.fromList
                 [ (now, df)
                 , (now, mem)
                 -- run two instances of pidstat, each triggered every 2 mins
                 -- each one is expected to collect stats for 1 minute
-                -- , (now, pidstat1)
-                -- , (addUTCTime 60 now, pidstat2)
+                , (now, pidstat1)
+                , (addUTCTime 60 now, pidstat2)
                 ]
   _ <- forkIO $ dbLogger msgq
   runScheduler (Scheduler queue [])
@@ -205,7 +255,6 @@ runScheduler scheduler = do
     sleep maxDelay t
       | t <= 0 = return ()
       | otherwise = threadDelay $ ceiling (min t maxDelay * 1e6)
-          -- Log.log $ "Sleep " <> showTxt t <> ", max " <> showTxt maxDelay
 
 nothingScheduled :: Scheduler -> Bool
 nothingScheduled Scheduler {..} =
@@ -230,11 +279,11 @@ reap Scheduler {..} = do
         Nothing ->
           return [Running a mvar]
         Just (Left e) -> do
-          Log.log $ "Job raised exception: " <> showTxt e
+          Log.warn $ "Job raised exception: " <> showTxt e
           putMVar mvar False
           return []
         Just (Right ()) -> do
-          Log.log "Job completed"
+          Log.debug "Job completed"
           putMVar mvar True
           return []
 
@@ -254,11 +303,11 @@ sow now s@Scheduler {..} =
 -- running set.
 start :: Scheduler -> UTCTime -> Job -> IO Scheduler
 start s@Scheduler {..} jobTime job = do
-  Log.log $ "Starting: " <> jobDescription job <> " scheduled for " <> showTxt jobTime
+  Log.debug $ "Starting: " <> jobDescription job <> " scheduled for " <> showTxt jobTime
   result <- tryTakeMVar (jobResult job)
   s' <- case result of
     Nothing -> do
-      Log.log "Skipping job, previous instance still busy"
+      Log.warn "Skipping job, previous instance still busy"
       return s
     Just _ -> do
       a <- async $ jobAction job

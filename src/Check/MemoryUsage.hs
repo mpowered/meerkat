@@ -34,10 +34,7 @@ Swap:    4294967296           0  4294967296
 type Parser = M.Parsec Void LText.Text
 
 sc :: Parser ()
-sc = L.space space1 empty empty
-
-space1 :: Parser ()
-space1 = M.skipSome (M.label "whitespace" $ C.oneOf [' ', '\t'])
+sc = L.space C.space1 empty empty
 
 lexeme :: Parser a -> Parser a
 lexeme = L.lexeme sc
@@ -50,6 +47,7 @@ int = lexeme L.decimal
 
 header :: Parser ()
 header = do
+  C.space1
   void $ symbol "total"
   void $ symbol "used"
   void $ symbol "free"
