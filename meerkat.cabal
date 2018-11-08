@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: f881a83bc82d120ecb0a6b53842e4b8648e11404d1268b44327604784355dfa7
+-- hash: b6e7831602324eb9e310d2f189e52dd22e5ef4e18b50c4b2799780a1b8786c03
 
 name:           meerkat
 version:        0.1.0.0
@@ -27,6 +27,7 @@ source-repository head
 library
   exposed-modules:
       Check.DiskSpaceUsage
+      Check.MemoryUsage
       Check.ProcessStatistics
       Database
   other-modules:

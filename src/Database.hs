@@ -16,6 +16,7 @@ import           Database.Beam
 
 data DB f = DB
   { dbDiskSpaceUsage :: f (TableEntity DiskSpaceUsageT)
+  , dbMemoryUsage    :: f (TableEntity MemoryUsageT)
   , dbProcessStats   :: f (TableEntity ProcessStatsT)
   } deriving Generic
 
@@ -62,3 +63,25 @@ instance Table ProcessStatsT where
 
 type ProcessStats = ProcessStatsT Identity
 deriving instance Show ProcessStats
+
+data MemoryUsageT f = MemoryUsageT
+  { muTime        :: C f UTCTime
+  , muHost        :: C f Text
+  , muTotalMem    :: C f Integer
+  , muUsedMem     :: C f Integer
+  , muFreeMem     :: C f Integer
+  , muSharedMem   :: C f Integer
+  , muBufferMem   :: C f Integer
+  , muCacheMem    :: C f Integer
+  , muAvailMem    :: C f Integer
+  , muTotalSwap   :: C f Integer
+  , muUsedSwap    :: C f Integer
+  , muFreeSwap    :: C f Integer
+  } deriving (Generic, Beamable)
+
+instance Table MemoryUsageT where
+  data PrimaryKey MemoryUsageT f = MemoryUsageKey (C f UTCTime) (C f Text) deriving (Generic, Beamable)
+  primaryKey = MemoryUsageKey <$> muTime <*> muHost
+
+type MemoryUsage = MemoryUsageT Identity
+deriving instance Show MemoryUsage

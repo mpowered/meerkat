@@ -27,6 +27,7 @@ import qualified Database.Beam.Postgres   as Pg
 import           Network.HostName         (getHostName)
 
 import           Check.DiskSpaceUsage
+import           Check.MemoryUsage
 import           Check.ProcessStatistics
 
 data Job = Job
@@ -90,14 +91,16 @@ main = Log.withStdoutLogging $ do
     ]
 
   df <- newPeriodicJob "Check disk space usage" (diskspace msgq hostname) 60
-  pidstat1 <- newPeriodicJob "Check process statistics" (pidstats msgq hostname) 120
-  pidstat2 <- newPeriodicJob "Check process statistics" (pidstats msgq hostname) 120
+  mem <- newPeriodicJob "Check memory usage" (memory msgq hostname) 60
+  -- pidstat1 <- newPeriodicJob "Check process statistics" (pidstats msgq hostname) 120
+  -- pidstat2 <- newPeriodicJob "Check process statistics" (pidstats msgq hostname) 120
   let queue = PQueue.fromList
                 [ (now, df)
+                , (now, mem)
                 -- run two instances of pidstat, each triggered every 2 mins
                 -- each one is expected to collect stats for 1 minute
-                , (now, pidstat1)
-                , (addUTCTime 60 now, pidstat2)
+                -- , (now, pidstat1)
+                -- , (addUTCTime 60 now, pidstat2)
                 ]
   _ <- forkIO $ dbLogger msgq
   runScheduler (Scheduler queue [])
@@ -148,6 +151,27 @@ diskspace msgq hostname = do
   where
     insertAction :: [DiskSpaceUsage] -> m ()
     insertAction = runInsert . insert (dbDiskSpaceUsage db) . insertValues
+
+memory
+  :: forall cmd be hdl m.
+     ( IsSql92Syntax cmd
+     , MonadBeam cmd be hdl m
+     , HasSqlValueSyntax (InsertValueSyntax cmd) Integer
+     , HasSqlValueSyntax (InsertValueSyntax cmd) Text.Text
+     , HasSqlValueSyntax (InsertValueSyntax cmd) UTCTime
+     )
+  => MessageQueue m
+  -> Text.Text
+  -> IO ()
+memory msgq hostname = do
+  now <- getCurrentTime
+  exceptT
+    print
+    (atomically . sendMessage msgq . SampleData . insertAction)
+    (memoryUsage hostname now)
+  where
+    insertAction :: [MemoryUsage] -> m ()
+    insertAction = runInsert . insert (dbMemoryUsage db) . insertValues
 
 pidstats
   :: forall cmd be hdl m.
