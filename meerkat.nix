@@ -21,7 +21,7 @@ database:
 binaries:
   df: ${pkgs.coreutils}/bin/df
   free: ${pkgs.procps}/bin/free
-  pidstat: ${pkgs.sysstat}/bin/df
+  pidstat: ${pkgs.sysstat}/bin/pidstat
 '';
 
 in {
