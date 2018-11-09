@@ -1,5 +1,9 @@
 host: neptune
 logging:
-  logfile: "meerkat.log"
+  # logfile: "meerkat.log"
   loglevel: debug
-dff: df
+database:
+  host: 10.0.0.8
+  user: tsdb
+  password: tsdb
+  database: tsdb

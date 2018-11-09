@@ -34,6 +34,7 @@ import           Check.ProcessStatistics
 data Config = Config
   { cfgHostname     :: Maybe Text.Text
   , cfgLogging      :: LogConfig
+  , cfgDatabase     :: Pg.ConnectInfo
   }
 
 data LogConfig = LogConfig
@@ -45,19 +46,29 @@ defaultLogConfig :: LogConfig
 defaultLogConfig = LogConfig Nothing Log.LevelInfo
 
 instance FromJSON Config where
-  parseJSON = withObject "Config" parseConfig
-    where
-      parseConfig o = Config
-        <$> o .:? "hostname"
-        <*> o .:? "logging" .!= defaultLogConfig
+  parseJSON = withObject "Config" $ \o ->
+    Config
+      <$> o .:? "hostname"
+      <*> o .:? "logging"  .!= defaultLogConfig
+      <*> o .:  "database"
 
 instance FromJSON LogConfig where
-  parseJSON = withObject "LogConfig" parseLogConfig
-    where
-      parseLogConfig o = LogConfig
-        <$> o .:? "logfile"  .!= cfgLogFile defaultLogConfig
-        <*> o .:? "loglevel" .!= cfgLogLevel defaultLogConfig
+  parseJSON = withObject "LogConfig" $ \o ->
+    LogConfig
+      <$> o .:? "logfile"  .!= cfgLogFile defaultLogConfig
+      <*> o .:? "loglevel" .!= cfgLogLevel defaultLogConfig
 
+-- Orphan
+instance FromJSON Pg.ConnectInfo where
+  parseJSON = withObject "ConnectInfo" $ \o ->
+    Pg.ConnectInfo
+      <$> o .:? "host"     .!= Pg.connectHost Pg.defaultConnectInfo
+      <*> o .:? "port"     .!= Pg.connectPort Pg.defaultConnectInfo
+      <*> o .:? "user"     .!= "meerkat"
+      <*> o .:? "password" .!= Pg.connectPassword Pg.defaultConnectInfo
+      <*> o .:? "database" .!= "meerkat"
+
+-- Orphan
 instance FromJSON Log.LogLevel where
   parseJSON = withText "LogLevel" parseLogLevel
     where
@@ -152,22 +163,16 @@ app Config{..} = do
                 , (now, pidstat1)
                 , (addUTCTime 60 now, pidstat2)
                 ]
-  _ <- forkIO $ dbLogger msgq
+  _ <- forkIO $ dbLogger cfgDatabase msgq
   runScheduler (Scheduler queue [])
 
 dbLogger
-  :: MessageQueue Pg.Pg
+  :: Pg.ConnectInfo
+  -> MessageQueue Pg.Pg
   -> IO ()
-dbLogger msgq =
+dbLogger conninfo msgq =
   bracket
-   ( Pg.connect
-      Pg.defaultConnectInfo
-        { Pg.connectHost = "10.0.0.8"
-        , Pg.connectUser = "tsdb"
-        , Pg.connectPassword = "tsdb"
-        , Pg.connectDatabase = "tsdb"
-        }
-    )
+    (Pg.connect conninfo)
     Pg.close
     loop
   where
