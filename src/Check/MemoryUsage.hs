@@ -79,12 +79,12 @@ parser host timestamp = do
   header
   vals host timestamp
 
-free :: ProcessConfig () () ()
-free = proc "free" ["-bw"]
+free :: FilePath -> ProcessConfig () () ()
+free bin = proc bin ["-bw"]
 
-memoryUsage :: Text.Text -> UTCTime -> ExceptT String IO [MemoryUsage]
-memoryUsage host timestamp = do
-  (stdout, _stderr) <- liftIO $ Proc.readProcess_ free
+memoryUsage :: FilePath -> Text.Text -> UTCTime -> ExceptT String IO [MemoryUsage]
+memoryUsage bin host timestamp = do
+  (stdout, _stderr) <- liftIO $ Proc.readProcess_ (free bin)
   let txt = Text.decodeUtf8 stdout
   case M.parse (parser host timestamp) "" txt of
     Left errmsg  -> throwE (M.parseErrorPretty' txt errmsg)

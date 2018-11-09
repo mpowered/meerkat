@@ -7,3 +7,7 @@ database:
   user: tsdb
   password: tsdb
   database: tsdb
+binaries:
+  df: "df"
+  free: "free"
+  pidstat: "pidstat"

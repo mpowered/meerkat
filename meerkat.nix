@@ -18,7 +18,11 @@ database:
   user: ${cfg.database.user}
   password: ${cfg.database.password}
   database: ${cfg.database.database}
-  '';
+binaries:
+  df: ${pkgs.coreutils}/bin/df
+  free: ${pkgs.procps}/bin/free
+  pidstat: ${pkgs.sysstat}/bin/df
+'';
 
 in {
   options.services.meerkat = {

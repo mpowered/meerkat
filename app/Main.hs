@@ -37,7 +37,17 @@ data Config = Config
   { cfgHostname     :: Maybe Text.Text
   , cfgLogging      :: LogConfig
   , cfgDatabase     :: Pg.ConnectInfo
+  , cfgBinaries     :: BinConfig
   }
+
+data BinConfig = BinConfig
+  { cfgDF           :: FilePath
+  , cfgFree         :: FilePath
+  , cfgPidstat      :: FilePath
+  }
+
+defaultBinConfig :: BinConfig
+defaultBinConfig = BinConfig "df" "free" "pidstat"
 
 data LogConfig = LogConfig
   { cfgLogFile      :: Maybe FilePath
@@ -53,12 +63,20 @@ instance FromJSON Config where
       <$> o .:? "hostname"
       <*> o .:? "logging"  .!= defaultLogConfig
       <*> o .:  "database"
+      <*> o .:  "binaries" .!= defaultBinConfig
 
 instance FromJSON LogConfig where
   parseJSON = withObject "LogConfig" $ \o ->
     LogConfig
       <$> o .:? "logfile"  .!= cfgLogFile defaultLogConfig
       <*> o .:? "loglevel" .!= cfgLogLevel defaultLogConfig
+
+instance FromJSON BinConfig where
+  parseJSON = withObject "BinConfig" $ \o ->
+    BinConfig
+      <$> o .:  "df"       .!= cfgDF defaultBinConfig
+      <*> o .:  "free"     .!= cfgFree defaultBinConfig
+      <*> o .:  "pidstat"  .!= cfgPidstat defaultBinConfig
 
 -- Orphan
 instance FromJSON Pg.ConnectInfo where
@@ -175,10 +193,10 @@ app Config{..} = do
     , showTxt now
     ]
 
-  df <- newPeriodicJob "Check disk space usage" (diskspace msgq hostname) 60
-  mem <- newPeriodicJob "Check memory usage" (memory msgq hostname) 60
-  pidstat1 <- newPeriodicJob "Check process statistics" (pidstats msgq hostname) 120
-  pidstat2 <- newPeriodicJob "Check process statistics" (pidstats msgq hostname) 120
+  df <- newPeriodicJob "Check disk space usage" (diskspace msgq (cfgDF cfgBinaries) hostname) 60
+  mem <- newPeriodicJob "Check memory usage" (memory msgq (cfgFree cfgBinaries) hostname) 60
+  pidstat1 <- newPeriodicJob "Check process statistics" (pidstats msgq (cfgPidstat cfgBinaries) hostname) 120
+  pidstat2 <- newPeriodicJob "Check process statistics" (pidstats msgq (cfgPidstat cfgBinaries) hostname) 120
   let queue = PQueue.fromList
                 [ (now, df)
                 , (now, mem)
@@ -219,14 +237,15 @@ diskspace
      , HasSqlValueSyntax (InsertValueSyntax cmd) UTCTime
      )
   => MessageQueue m
+  -> FilePath
   -> Text.Text
   -> IO ()
-diskspace msgq hostname = do
+diskspace msgq bin hostname = do
   now <- getCurrentTime
   exceptT
     print
     (atomically . sendMessage msgq . SampleData . insertAction)
-    (freespace hostname now)
+    (freespace bin hostname now)
   where
     insertAction :: [DiskSpaceUsage] -> m ()
     insertAction = runInsert . insert (dbDiskSpaceUsage db) . insertValues
@@ -240,14 +259,15 @@ memory
      , HasSqlValueSyntax (InsertValueSyntax cmd) UTCTime
      )
   => MessageQueue m
+  -> FilePath
   -> Text.Text
   -> IO ()
-memory msgq hostname = do
+memory msgq bin hostname = do
   now <- getCurrentTime
   exceptT
     print
     (atomically . sendMessage msgq . SampleData . insertAction)
-    (memoryUsage hostname now)
+    (memoryUsage bin hostname now)
   where
     insertAction :: [MemoryUsage] -> m ()
     insertAction = runInsert . insert (dbMemoryUsage db) . insertValues
@@ -262,13 +282,14 @@ pidstats
      , HasSqlValueSyntax (InsertValueSyntax cmd) UTCTime
      )
   => MessageQueue m
+  -> FilePath
   -> Text.Text
   -> IO ()
-pidstats msgq hostname =
+pidstats msgq bin hostname =
   exceptT
     print
     (atomically . sendMessage msgq . SampleData . insertAction)
-    (processes hostname)
+    (processes bin hostname)
   where
     insertAction :: [ProcessStats] -> m ()
     insertAction = runInsert . insert (dbProcessStats db) . insertValues

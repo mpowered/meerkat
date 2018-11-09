@@ -53,16 +53,16 @@ parser :: Text.Text -> UTCTime -> Parser [DiskSpaceUsage]
 parser host time =
   M.manyTill C.anyChar C.eol *> M.many (usage host time) <* M.eof
 
-df :: ProcessConfig () () ()
-df = proc "df" args
+df :: FilePath -> ProcessConfig () () ()
+df bin = proc bin args
   where
     args = ["-lk", "--output=source,fstype,size,used,avail,target"] ++ exclusions
     exclusions = concatMap exclude ["tmpfs", "devtmpfs"]
     exclude e = ["-x", e]
 
-freespace :: Text.Text -> UTCTime -> ExceptT String IO [DiskSpaceUsage]
-freespace host timestamp = do
-  (stdout, _stderr) <- liftIO $ Proc.readProcess_ df
+freespace :: FilePath -> Text.Text -> UTCTime -> ExceptT String IO [DiskSpaceUsage]
+freespace bin host timestamp = do
+  (stdout, _stderr) <- liftIO $ Proc.readProcess_ (df bin)
   let txt = Text.decodeUtf8 stdout
   case M.parse (parser host timestamp) "" txt of
     Left errmsg  -> throwE (M.parseErrorPretty' txt errmsg)

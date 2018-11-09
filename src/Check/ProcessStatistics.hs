@@ -129,12 +129,12 @@ parser host timestamp = go []
           return (ps : ps')
         Preamble -> go headers
 
-pidstat :: ProcessConfig () () ()
-pidstat = proc "pidstat" ["60", "1", "-druhl"]
+pidstat :: FilePath -> ProcessConfig () () ()
+pidstat bin = proc bin ["60", "1", "-druhl"]
 
-processes :: Text.Text -> ExceptT String IO [ProcessStats]
-processes host = do
-  (stdout, _stderr) <- liftIO $ Proc.readProcess_ pidstat
+processes :: FilePath -> Text.Text -> ExceptT String IO [ProcessStats]
+processes bin host = do
+  (stdout, _stderr) <- liftIO $ Proc.readProcess_ (pidstat bin)
   -- Only the time (not date) is able to be parsed, for now we override times
   -- with the current time _after_ the process has completed.
   now <- liftIO getCurrentTime

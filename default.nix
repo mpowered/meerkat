@@ -8,11 +8,7 @@ let
 
   inherit (nixpkgs) pkgs;
 
-  haskellPackages = pkgs.haskell.packages."${compiler}".override {
-    overrides = self: super: {
-      # meerkat = self.callPackage ./. {};
-    };
-  };
+  haskellPackages = pkgs.haskell.packages."${compiler}";
 
   drv = haskellPackages.callCabal2nix "meerkat" ./. {};
 
