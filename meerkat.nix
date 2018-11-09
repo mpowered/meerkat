@@ -2,10 +2,31 @@
 with lib;
 let
   cfg = config.services.meerkat;
-  meerkat = self.callPackage ./. {};
+  src = builtins.fetchTarball {
+    url = https://github.com/mpowered/meerkat/archive/REV.tar.gz;
+    sha256 = "SHA";
+  };
+  meerkat = (import src {}).meerkat;
+  meerkatConfig = pkgs.writeText "meerkat.yaml" ''
+host: ${cfg.host}
+logging:
+  # logfile: "meerkat.log"
+  loglevel: info
+database:
+  host: ${cfg.database.host}
+  port: ${toString cfg.database.port}
+  user: ${cfg.database.user}
+  password: ${cfg.database.password}
+  database: ${cfg.database.database}
+  '';
+
 in {
   options.services.meerkat = {
     enable = mkEnableOption "meerkat service";
+    host = mkOption {
+      type = types.string;
+      description = ''Host that identifies this system to report with metrics.'';
+    };
     database = {
       host = mkOption {
         type = types.string;
