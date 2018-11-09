@@ -29,6 +29,7 @@ dependencies:
 - hostname >= 1.0 && < 1.1
 - logging >= 3.0.5 && < 3.1
 - megaparsec >= 6.5.0 && < 6.6
+- optparse-applicative  >= 0.14 && < 0.15
 - pqueue >= 1.4.1.2 && < 1.5
 - scientific >= 0.3.6.2 && < 0.4
 - stm >= 2.4.5.1 && < 2.5

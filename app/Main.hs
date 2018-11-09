@@ -26,6 +26,8 @@ import           Database.Beam
 import           Database.Beam.Backend.SQL.SQL92
 import qualified Database.Beam.Postgres   as Pg
 import           Network.HostName         (getHostName)
+import qualified Options.Applicative      as OptParse
+import           Options.Applicative      ((<**>))
 
 import           Check.DiskSpaceUsage
 import           Check.MemoryUsage
@@ -78,6 +80,19 @@ instance FromJSON Log.LogLevel where
       parseLogLevel "error" = return Log.LevelError
       parseLogLevel txt     = fail $ "'" <> Text.unpack txt <> "' is not a valid log level"
 
+newtype MeerkatOptions = MeerkatOptions
+  { configFile :: FilePath
+  }
+
+meerkatOptions :: OptParse.Parser MeerkatOptions
+meerkatOptions = MeerkatOptions <$> OptParse.strOption
+  (  OptParse.long "config-file"
+  <> OptParse.metavar "PATH"
+  <> OptParse.short 'c'
+  <> OptParse.value "meerkat.yaml"
+  <> OptParse.help "Path to Meerkat configuration file"
+  )
+
 data Job = Job
   { jobDescription  :: Text.Text
   , jobAction       :: IO ()
@@ -127,8 +142,17 @@ recvMessage :: MessageQueue m -> STM (Message m)
 recvMessage = readTBQueue
 
 main :: IO ()
-main = decodeFileEither "meerkat.yaml" >>= either parseError runApp
+main = OptParse.execParser opts >>= initialise
   where
+    opts = OptParse.info
+      (meerkatOptions <**> OptParse.helper)
+      (OptParse.fullDesc <> OptParse.progDesc "Meerkat" <> OptParse.header
+        "Meerkat - monitors your system"
+      )
+
+    initialise MeerkatOptions{..} =
+      decodeFileEither configFile >>= either parseError runApp
+
     parseError e = do
       putStrLn "Unable to parse configuration file"
       putStrLn $ prettyPrintParseException e
