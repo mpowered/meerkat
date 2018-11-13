@@ -21,6 +21,7 @@ import qualified Data.PQueue.Prio.Min     as PQueue
 import           Data.Scientific
 import qualified Data.Text                as Text
 import           Data.Time.Clock
+import           Data.Version
 import           Data.Yaml
 import           Database
 import           Database.Beam
@@ -33,6 +34,8 @@ import           Options.Applicative      ((<**>))
 import           Check.DiskSpaceUsage
 import           Check.MemoryUsage
 import           Check.ProcessStatistics
+
+import           Paths_meerkat
 
 data Config = Config
   { cfgHostname     :: Maybe Text.Text
@@ -188,7 +191,7 @@ app Config{..} = do
   hostname <- maybe (Text.pack <$> getHostName) return cfgHostname
   now <- getCurrentTime
   Log.log $ Text.unwords
-    [ "Meerkat started on"
+    [ "Meerkat " <> Text.pack (showVersion version) <> " started on"
     , hostname
     , "at"
     , showTxt now
