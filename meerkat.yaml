@@ -1,4 +1,4 @@
-host: neptune
+hostname: neptune
 logging:
   # logfile: "meerkat.log"
   loglevel: debug

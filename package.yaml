@@ -31,6 +31,7 @@ dependencies:
 - megaparsec >= 6.5.0 && < 6.6
 - optparse-applicative  >= 0.14 && < 0.15
 - pqueue >= 1.4.1.1 && < 1.5
+- resource-pool >= 0.2.3 && < 0.3
 - scientific >= 0.3.6.2 && < 0.4
 - stm >= 2.4.5.0 && < 2.5
 - text >= 1.2.3 && < 1.3

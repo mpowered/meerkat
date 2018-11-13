@@ -13,9 +13,10 @@ import           Control.Concurrent
 import           Control.Concurrent.Async
 import           Control.Concurrent.STM
 import           Control.Error
-import           Control.Exception        (bracket)
+import           Control.Exception
 import qualified Control.Logging          as Log
 import           Control.Monad
+import           Data.Pool
 import qualified Data.PQueue.Prio.Min     as PQueue
 import           Data.Scientific
 import qualified Data.Text                as Text
@@ -149,7 +150,6 @@ data Scheduler = Scheduler
 
 data Message m where
   SampleData :: m () -> Message m
-  Shutdown :: Message m
 
 type MessageQueue m = TBQueue (Message m)
 
@@ -184,6 +184,7 @@ main = OptParse.execParser opts >>= initialise
 app :: Config -> IO ()
 app Config{..} = do
   msgq <- atomically $ newTBQueue 1000
+  shutdown <- atomically $ newTVar False
   hostname <- maybe (Text.pack <$> getHostName) return cfgHostname
   now <- getCurrentTime
   Log.log $ Text.unwords
@@ -205,26 +206,54 @@ app Config{..} = do
                 , (now, pidstat1)
                 , (addUTCTime 60 now, pidstat2)
                 ]
-  _ <- forkIO $ dbLogger cfgDatabase msgq
+  logger <- async $ do
+    -- Pool with just a single connection that closes after 120s of idle
+    createPool (Pg.connect cfgDatabase) Pg.close 1 120 1 >>=
+      dbLogger msgq shutdown
+
   runScheduler (Scheduler queue [])
 
+  atomically $ writeTVar shutdown True
+  Log.log "Waiting for database logger to complete"
+  void $ wait logger
+
+data LoggerResult
+  = LoggerContinue
+  | LoggerDone
+
 dbLogger
-  :: Pg.ConnectInfo
-  -> MessageQueue Pg.Pg
+  :: MessageQueue Pg.Pg
+  -> TVar Bool
+  -> Pool Pg.Connection
   -> IO ()
-dbLogger conninfo msgq =
-  bracket
-    (Pg.connect conninfo)
-    Pg.close
-    loop
+dbLogger msgq shutdown pool = loop initialBackoff
   where
-    loop conn = do
-      msg <- atomically $ recvMessage msgq
-      case msg of
-        SampleData insertAction -> do
+    loop backoff = do
+      state <- try (withResource pool logData)
+      case state of
+        Left (e :: SomeException) -> do
+          Log.warn $ "Database logger raised exception: " <> showTxt e
+          Log.log $ "Database logger sleeping " <> showTxt backoff <> " seconds"
+          threadDelay (backoff * 1000000)
+          flag <- atomically $ readTVar shutdown
+          unless flag $ loop (min (backoff * 2) maxBackoff)
+        Right LoggerContinue -> loop initialBackoff
+        Right LoggerDone -> return ()
+
+    logData conn = do
+      action <- atomically $
+        (Right <$> recvMessage msgq) `orElse` (Left <$> checkShutdown)
+      case action of
+        Left () ->
+          return LoggerDone
+        Right (SampleData insertAction) -> do
           Pg.runBeamPostgresDebug (Log.debug . Text.pack) conn insertAction
-          loop conn
-        Shutdown -> return ()
+          return LoggerContinue
+
+    checkShutdown = check =<< readTVar shutdown
+
+    initialBackoff = 1  -- 1 sec
+    maxBackoff = 300    -- 5 min
 
 type InsertValueSyntax cmd = Sql92ExpressionValueSyntax (Sql92InsertValuesExpressionSyntax (Sql92InsertValuesSyntax (Sql92InsertSyntax cmd)))
 
@@ -295,16 +324,25 @@ pidstats msgq bin hostname =
     insertAction = runInsert . insert (dbProcessStats db) . insertValues
 
 runScheduler :: Scheduler -> IO ()
-runScheduler scheduler = do
-  (scheduler', delay) <- schedule scheduler
-  unless (nothingScheduled scheduler') $ do
-    let maxDelay = if null (running scheduler') then 10 else 1
-    sleep maxDelay delay
-    runScheduler scheduler'
+runScheduler scheduler =
+  catchJust
+    isUserInterrupt
+    go
+    (const $ Log.log "UserInterrupt")
   where
+    go = do
+      (scheduler', delay) <- schedule scheduler
+      unless (nothingScheduled scheduler') $ do
+        let maxDelay = if null (running scheduler') then 10 else 1
+        sleep maxDelay delay
+        runScheduler scheduler'
+
     sleep maxDelay t
       | t <= 0 = return ()
       | otherwise = threadDelay $ ceiling (min t maxDelay * 1e6)
+
+    isUserInterrupt UserInterrupt = Just ()
+    isUserInterrupt _ = Nothing
 
 nothingScheduled :: Scheduler -> Bool
 nothingScheduled Scheduler {..} =
