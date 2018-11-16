@@ -330,15 +330,15 @@ runScheduler :: Scheduler -> IO ()
 runScheduler scheduler =
   catchJust
     isUserInterrupt
-    go
+    (go scheduler)
     (const $ Log.log "UserInterrupt")
   where
-    go = do
-      (scheduler', delay) <- schedule scheduler
-      unless (nothingScheduled scheduler') $ do
-        let maxDelay = if null (running scheduler') then 10 else 1
+    go s = do
+      (s', delay) <- schedule s
+      unless (nothingScheduled s') $ do
+        let maxDelay = if null (running s') then 10 else 2
         sleep maxDelay delay
-        runScheduler scheduler'
+        go s'
 
     sleep maxDelay t
       | t <= 0 = return ()

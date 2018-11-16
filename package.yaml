@@ -1,5 +1,5 @@
 name:                meerkat
-version:             0.1.0.0
+version:             0.1.0.1
 github:              "mpowered/meerkat"
 license:             BSD3
 author:              "Shaun Sharples"
@@ -41,7 +41,7 @@ dependencies:
 
 ghc-options:
 - -Wall
-- -O
+- -O2
 
 library:
   source-dirs: src
