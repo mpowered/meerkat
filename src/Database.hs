@@ -18,6 +18,7 @@ data DB f = DB
   { dbDiskSpaceUsage :: f (TableEntity DiskSpaceUsageT)
   , dbMemoryUsage    :: f (TableEntity MemoryUsageT)
   , dbProcessStats   :: f (TableEntity ProcessStatsT)
+  , dbSidekiqQueues  :: f (TableEntity SidekiqQueueT)
   } deriving Generic
 
 instance Database be DB
@@ -85,3 +86,16 @@ instance Table MemoryUsageT where
 
 type MemoryUsage = MemoryUsageT Identity
 deriving instance Show MemoryUsage
+
+data SidekiqQueueT f = SidekiqQueueT
+  { sqTime        :: C f UTCTime
+  , sqQueue       :: C f Text
+  , sqLength      :: C f Integer
+  } deriving (Generic, Beamable)
+
+instance Table SidekiqQueueT where
+  data PrimaryKey SidekiqQueueT f = SidekiqQueueKey (C f UTCTime) (C f Text) deriving (Generic, Beamable)
+  primaryKey = SidekiqQueueKey <$> sqTime <*> sqQueue
+
+type SidekiqQueue = SidekiqQueueT Identity
+deriving instance Show SidekiqQueue

@@ -7,4 +7,4 @@ extra-deps:
 nix:
   packages:
     - pkgconfig
-    - postgresql100
+    - postgresql_10

@@ -1,13 +1,18 @@
 hostname: neptune
 logging:
-  # logfile: "meerkat.log"
+  # logfile: meerkat.log
   loglevel: debug
 database:
-  host: 10.0.0.8
-  user: tsdb
-  password: tsdb
-  database: tsdb
+  host: localhost
+  user: meerkat
+  password: meerkat
+  database: meerkat
+sidekiq:
+  database: redis://localhost/0
+  queues:
+    - production:queue:toolkit_low_priority_production
+    - production:queue:toolkit_slow_production
 binaries:
-  df: "df"
-  free: "free"
-  pidstat: "pidstat"
+  df: df
+  free: free
+  pidstat: pidstat

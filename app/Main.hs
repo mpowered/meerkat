@@ -6,6 +6,7 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TupleSections         #-}
 
 module Main where
 
@@ -18,7 +19,9 @@ import qualified Control.Logging          as Log
 import           Control.Monad
 import           Data.Pool
 import qualified Data.PQueue.Prio.Min     as PQueue
+import qualified Database.Redis           as Redis
 import           Data.Scientific
+import           Data.Text                (Text)
 import qualified Data.Text                as Text
 import           Data.Time.Clock
 import           Data.Version
@@ -34,14 +37,16 @@ import           Options.Applicative      ((<**>))
 import           Check.DiskSpaceUsage
 import           Check.MemoryUsage
 import           Check.ProcessStatistics
+import           Check.SidekiqQueues
 
 import           Paths_meerkat
 
 data Config = Config
-  { cfgHostname     :: Maybe Text.Text
+  { cfgHostname     :: Maybe Text
   , cfgLogging      :: LogConfig
   , cfgDatabase     :: Pg.ConnectInfo
   , cfgBinaries     :: BinConfig
+  , cfgSidekiq      :: Maybe SidekiqConfig
   }
 
 data BinConfig = BinConfig
@@ -61,13 +66,19 @@ data LogConfig = LogConfig
 defaultLogConfig :: LogConfig
 defaultLogConfig = LogConfig Nothing Log.LevelInfo
 
+data SidekiqConfig = SidekiqConfig
+  { cfgSkDatabase   :: Redis.ConnectInfo
+  , cfgSkQueues     :: [Text]
+  }
+
 instance FromJSON Config where
   parseJSON = withObject "Config" $ \o ->
     Config
       <$> o .:? "hostname"
       <*> o .:? "logging"  .!= defaultLogConfig
       <*> o .:  "database"
-      <*> o .:  "binaries" .!= defaultBinConfig
+      <*> o .:? "binaries" .!= defaultBinConfig
+      <*> o .:? "sidekiq"
 
 instance FromJSON LogConfig where
   parseJSON = withObject "LogConfig" $ \o ->
@@ -78,9 +89,15 @@ instance FromJSON LogConfig where
 instance FromJSON BinConfig where
   parseJSON = withObject "BinConfig" $ \o ->
     BinConfig
-      <$> o .:  "df"       .!= cfgDF defaultBinConfig
-      <*> o .:  "free"     .!= cfgFree defaultBinConfig
-      <*> o .:  "pidstat"  .!= cfgPidstat defaultBinConfig
+      <$> o .:? "df"       .!= cfgDF defaultBinConfig
+      <*> o .:? "free"     .!= cfgFree defaultBinConfig
+      <*> o .:? "pidstat"  .!= cfgPidstat defaultBinConfig
+
+instance FromJSON SidekiqConfig where
+  parseJSON = withObject "SidekiqConfig" $ \o ->
+    SidekiqConfig
+      <$> o .:  "database"
+      <*> o .:  "queues"
 
 -- Orphan
 instance FromJSON Pg.ConnectInfo where
@@ -91,6 +108,11 @@ instance FromJSON Pg.ConnectInfo where
       <*> o .:? "user"     .!= "meerkat"
       <*> o .:? "password" .!= Pg.connectPassword Pg.defaultConnectInfo
       <*> o .:? "database" .!= "meerkat"
+
+-- Orphan
+instance FromJSON Redis.ConnectInfo where
+  parseJSON = withText "ConnectInfo" $
+    either fail return . Redis.parseConnectInfo . Text.unpack
 
 -- Orphan
 instance FromJSON Log.LogLevel where
@@ -116,13 +138,13 @@ meerkatOptions = MeerkatOptions <$> OptParse.strOption
   )
 
 data Job = Job
-  { jobDescription  :: Text.Text
+  { jobDescription  :: Text
   , jobAction       :: IO ()
   , jobInterval     :: Maybe NominalDiffTime
   , jobResult       :: MVar Bool
   }
 
-newPeriodicJob :: Text.Text -> IO () -> NominalDiffTime -> IO Job
+newPeriodicJob :: Text -> IO () -> NominalDiffTime -> IO Job
 newPeriodicJob desc action interval = do
   result <- newMVar True
   return
@@ -132,7 +154,7 @@ newPeriodicJob desc action interval = do
         , jobResult       = result
         }
 
-newStreamingJob :: Text.Text -> IO () -> IO Job
+newStreamingJob :: Text -> IO () -> IO Job
 newStreamingJob desc action = do
   result <- newMVar True
   return
@@ -141,6 +163,8 @@ newStreamingJob desc action = do
         , jobInterval     = Nothing
         , jobResult       = result
         }
+
+type JobSpec = (UTCTime, Job)
 
 type JobQueue = PQueue.MinPQueue UTCTime Job
 
@@ -199,15 +223,17 @@ app Config{..} = do
 
   df <- newPeriodicJob "Check disk space usage" (diskspace msgq (cfgDF cfgBinaries) hostname) 60
   mem <- newPeriodicJob "Check memory usage" (memory msgq (cfgFree cfgBinaries) hostname) 10
+  sk <- maybe (return Nothing) (\cfg -> Just <$> newPeriodicJob "Check sidekiq queues" (sidekiq msgq cfg) 10) cfgSidekiq
   pidstat1 <- newPeriodicJob "Check process statistics" (pidstats msgq (cfgPidstat cfgBinaries) hostname) 120
   pidstat2 <- newPeriodicJob "Check process statistics" (pidstats msgq (cfgPidstat cfgBinaries) hostname) 120
-  let queue = PQueue.fromList
-                [ (now, df)
-                , (now, mem)
+  let queue = PQueue.fromList $ catMaybes
+                [ Just (now, df)
+                , Just (now, mem)
+                , (now, ) <$> sk
                 -- run two instances of pidstat, each triggered every 2 mins
                 -- each one is expected to collect stats for 1 minute
-                , (now, pidstat1)
-                , (addUTCTime 60 now, pidstat2)
+                , Just (now, pidstat1)
+                , Just (addUTCTime 60 now, pidstat2)
                 ]
   logger <- async $ do
     -- Pool with just a single connection that closes after 120s of idle
@@ -265,12 +291,12 @@ diskspace
      ( IsSql92Syntax cmd
      , MonadBeam cmd be hdl m
      , HasSqlValueSyntax (InsertValueSyntax cmd) Integer
-     , HasSqlValueSyntax (InsertValueSyntax cmd) Text.Text
+     , HasSqlValueSyntax (InsertValueSyntax cmd) Text
      , HasSqlValueSyntax (InsertValueSyntax cmd) UTCTime
      )
   => MessageQueue m
   -> FilePath
-  -> Text.Text
+  -> Text
   -> IO ()
 diskspace msgq bin hostname = do
   now <- getCurrentTime
@@ -287,12 +313,12 @@ memory
      ( IsSql92Syntax cmd
      , MonadBeam cmd be hdl m
      , HasSqlValueSyntax (InsertValueSyntax cmd) Integer
-     , HasSqlValueSyntax (InsertValueSyntax cmd) Text.Text
+     , HasSqlValueSyntax (InsertValueSyntax cmd) Text
      , HasSqlValueSyntax (InsertValueSyntax cmd) UTCTime
      )
   => MessageQueue m
   -> FilePath
-  -> Text.Text
+  -> Text
   -> IO ()
 memory msgq bin hostname = do
   now <- getCurrentTime
@@ -304,18 +330,39 @@ memory msgq bin hostname = do
     insertAction :: [MemoryUsage] -> m ()
     insertAction = runInsert . insert (dbMemoryUsage db) . insertValues
 
+sidekiq
+  :: forall cmd be hdl m.
+     ( IsSql92Syntax cmd
+     , MonadBeam cmd be hdl m
+     , HasSqlValueSyntax (InsertValueSyntax cmd) Integer
+     , HasSqlValueSyntax (InsertValueSyntax cmd) Text
+     , HasSqlValueSyntax (InsertValueSyntax cmd) UTCTime
+     )
+  => MessageQueue m
+  -> SidekiqConfig
+  -> IO ()
+sidekiq msgq SidekiqConfig{..} = do
+  now <- getCurrentTime
+  exceptT
+    print
+    (atomically . sendMessage msgq . SampleData . insertAction)
+    (sidekiqQueues cfgSkQueues cfgSkDatabase now)
+  where
+    insertAction :: [SidekiqQueue] -> m ()
+    insertAction = runInsert . insert (dbSidekiqQueues db) . insertValues
+
 pidstats
   :: forall cmd be hdl m.
      ( IsSql92Syntax cmd
      , MonadBeam cmd be hdl m
      , HasSqlValueSyntax (InsertValueSyntax cmd) (Maybe Integer)
-     , HasSqlValueSyntax (InsertValueSyntax cmd) Text.Text
+     , HasSqlValueSyntax (InsertValueSyntax cmd) Text
      , HasSqlValueSyntax (InsertValueSyntax cmd) (Maybe Scientific)
      , HasSqlValueSyntax (InsertValueSyntax cmd) UTCTime
      )
   => MessageQueue m
   -> FilePath
-  -> Text.Text
+  -> Text
   -> IO ()
 pidstats msgq bin hostname =
   exceptT
@@ -416,5 +463,5 @@ reschedule jobTime job =
     Nothing ->
       PQueue.deleteMin
 
-showTxt :: Show a => a -> Text.Text
+showTxt :: Show a => a -> Text
 showTxt = Text.pack . show
