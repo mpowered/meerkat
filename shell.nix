@@ -1,2 +1,2 @@
-{ compiler ? "ghc843" }:
+{ compiler ? "ghc844" }:
 (import ./. { inherit compiler; }).meerkat-shell

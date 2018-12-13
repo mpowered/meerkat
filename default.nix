@@ -1,4 +1,4 @@
-{ compiler ? "ghc843" }:
+{ compiler ? "ghc844" }:
 
 let
   nixpkgs = import (builtins.fetchTarball {

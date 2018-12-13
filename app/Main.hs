@@ -235,7 +235,7 @@ app Config{..} = do
                 , Just (now, pidstat1)
                 , Just (addUTCTime 60 now, pidstat2)
                 ]
-  logger <- async $ do
+  logger <- async $
     -- Pool with just a single connection that closes after 120s of idle
     createPool (Pg.connect cfgDatabase) Pg.close 1 120 1 >>=
       dbLogger msgq shutdown
@@ -264,7 +264,7 @@ dbLogger msgq shutdown pool = loop initialBackoff
           Log.warn $ "Database logger raised exception: " <> showTxt e
           Log.log $ "Database logger sleeping " <> showTxt backoff <> " seconds"
           threadDelay (backoff * 1000000)
-          flag <- atomically $ readTVar shutdown
+          flag <- readTVarIO shutdown
           unless flag $ loop (min (backoff * 2) maxBackoff)
         Right LoggerContinue -> loop initialBackoff
         Right LoggerDone -> return ()
