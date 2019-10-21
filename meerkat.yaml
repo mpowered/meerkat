@@ -9,7 +9,7 @@ database:
   database: meerkat
 sidekiq:
   database: redis://localhost/0
-  queues: production:queues
+  queues: production
 binaries:
   df: df
   free: free
