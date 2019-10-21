@@ -12,26 +12,27 @@ where
 
 import           Control.Error
 import           Control.Exception
-import           Control.Monad.IO.Class     (liftIO)
 import           Data.Text                  (Text)
 import qualified Data.Text.Encoding         as Text
 import           Data.Time.Clock            (UTCTime)
 import           Database
 import qualified Database.Redis             as Redis
 
-sidekiqQueues :: [Text] -> Redis.ConnectInfo -> UTCTime -> ExceptT String IO [SidekiqQueue]
-sidekiqQueues queues conninfo timestamp = do
-  results <- catchConnectionLost $ do
-    bracket (Redis.checkedConnect conninfo) (Redis.disconnect) $ \conn ->
-      Redis.runRedis conn $ do
-        mapM Redis.llen (Text.encodeUtf8 <$> queues)
-  case sequence results of
-    Left reply -> throwE $ "Redis returned reply: " ++ show reply
-    Right qlens -> return $ zipWith (SidekiqQueueT timestamp) queues qlens
+runRedis :: Redis.Connection -> Redis.Redis (Either Redis.Reply a) -> ExceptT String IO a
+runRedis conn r = withExceptT redisResult $ ExceptT $ Redis.runRedis conn r
   where
-    catchConnectionLost :: IO a -> ExceptT String IO a
-    catchConnectionLost action = do
-      r <- liftIO $ try action
-      case r of
-        Left Redis.ConnectionLost -> throwE "Redis connection lost"
-        Right a -> return a
+    redisResult (Redis.Error msg) = "Redis error: " ++ show msg
+    redisResult _                 = "Redis returned unexpected result"
+
+withConn :: Redis.ConnectInfo -> (Redis.Connection -> ExceptT String IO a) -> ExceptT String IO a
+withConn conninfo a = do
+  e <- withExceptT show $ tryIO $
+    bracket (Redis.checkedConnect conninfo) Redis.disconnect (runExceptT . a)
+  hoistEither e
+
+sidekiqQueues :: Text -> Redis.ConnectInfo -> UTCTime -> ExceptT String IO [SidekiqQueue]
+sidekiqQueues queues conninfo timestamp =
+  withConn conninfo $ \conn -> do
+    qnames <- runRedis conn $ Redis.smembers (Text.encodeUtf8 queues)
+    qlens <- runRedis conn $ sequence <$> mapM Redis.llen qnames
+    return $ zipWith (SidekiqQueueT timestamp) (Text.decodeUtf8 <$> qnames) qlens

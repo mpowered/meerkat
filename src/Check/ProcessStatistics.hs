@@ -39,7 +39,7 @@ sc :: Parser ()
 sc = L.space space1 empty empty
 
 space1 :: Parser ()
-space1 = M.skipSome (M.label "whitespace" $ C.oneOf [' ', '\t'])
+space1 = M.skipSome (M.label "whitespace" $ M.oneOf [' ', '\t'])
 
 lexeme :: Parser a -> Parser a
 lexeme = L.lexeme sc
@@ -140,5 +140,5 @@ processes bin host = do
   now <- liftIO getCurrentTime
   let txt = Text.decodeUtf8 stdout
   case M.parse (parser host now) "" txt of
-    Left errmsg  -> throwE (M.parseErrorPretty' txt errmsg)
+    Left errbundle  -> throwE (M.errorBundlePretty errbundle)
     Right usages -> return usages

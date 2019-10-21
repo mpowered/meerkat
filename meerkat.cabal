@@ -1,11 +1,13 @@
--- This file has been generated from package.yaml by hpack version 0.28.2.
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.31.2.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 4850053185b2d7ff2035567b1afb6689e745cc21e9ada64cb9292fc6f7d70090
+-- hash: 79f055f84038c5f2a65c3c304729cb2255ce7bc0e5e415840b3fd527974e9da5
 
 name:           meerkat
-version:        0.1.0.1
+version:        0.2.0.0
 description:    Please see the README on GitHub at <https://github.com/mpowered/meerkat#readme>
 homepage:       https://github.com/mpowered/meerkat#readme
 bug-reports:    https://github.com/mpowered/meerkat/issues
@@ -15,10 +17,9 @@ copyright:      2018 Shaun Sharples
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
-cabal-version:  >= 1.10
 extra-source-files:
-    ChangeLog.md
     README.md
+    ChangeLog.md
 
 source-repository head
   type: git
@@ -39,23 +40,23 @@ library
   build-depends:
       async >=2.2.1 && <2.3
     , base >=4.7 && <5
-    , beam-core >=0.7.2.2 && <0.8
-    , beam-postgres >=0.3.2.2 && <0.4
+    , beam-core >=0.8 && <0.9
+    , beam-postgres >=0.4.0.0 && <0.5
     , bytestring >=0.10.8.2 && <0.11
     , errors >=2.3.0 && <2.4
-    , hedis >=0.10.4 && <0.11
+    , hedis >=0.12.8 && <0.13
     , hostname >=1.0 && <1.1
     , logging >=3.0.5 && <3.1
-    , megaparsec >=6.5.0 && <6.6
+    , megaparsec >=7.0.5 && <7.1
     , optparse-applicative >=0.14 && <0.15
     , pqueue >=1.4.1.1 && <1.5
     , resource-pool >=0.2.3 && <0.3
     , scientific >=0.3.6.2 && <0.4
-    , stm >=2.4.5.0 && <2.5
+    , stm >=2.5.0.0 && <2.6
     , text >=1.2.3 && <1.3
     , time >=1.8.0.2 && <1.9
     , typed-process >=0.2.3.0 && <0.3
-    , yaml >=0.8.32 && <0.9
+    , yaml >=0.11 && <0.12
   default-language: Haskell2010
 
 executable meerkat
@@ -68,24 +69,24 @@ executable meerkat
   build-depends:
       async >=2.2.1 && <2.3
     , base >=4.7 && <5
-    , beam-core >=0.7.2.2 && <0.8
-    , beam-postgres >=0.3.2.2 && <0.4
+    , beam-core >=0.8 && <0.9
+    , beam-postgres >=0.4.0.0 && <0.5
     , bytestring >=0.10.8.2 && <0.11
     , errors >=2.3.0 && <2.4
-    , hedis >=0.10.4 && <0.11
+    , hedis >=0.12.8 && <0.13
     , hostname >=1.0 && <1.1
     , logging >=3.0.5 && <3.1
     , meerkat
-    , megaparsec >=6.5.0 && <6.6
+    , megaparsec >=7.0.5 && <7.1
     , optparse-applicative >=0.14 && <0.15
     , pqueue >=1.4.1.1 && <1.5
     , resource-pool >=0.2.3 && <0.3
     , scientific >=0.3.6.2 && <0.4
-    , stm >=2.4.5.0 && <2.5
+    , stm >=2.5.0.0 && <2.6
     , text >=1.2.3 && <1.3
     , time >=1.8.0.2 && <1.9
     , typed-process >=0.2.3.0 && <0.3
-    , yaml >=0.8.32 && <0.9
+    , yaml >=0.11 && <0.12
   default-language: Haskell2010
 
 test-suite meerkat-test
@@ -99,22 +100,22 @@ test-suite meerkat-test
   build-depends:
       async >=2.2.1 && <2.3
     , base >=4.7 && <5
-    , beam-core >=0.7.2.2 && <0.8
-    , beam-postgres >=0.3.2.2 && <0.4
+    , beam-core >=0.8 && <0.9
+    , beam-postgres >=0.4.0.0 && <0.5
     , bytestring >=0.10.8.2 && <0.11
     , errors >=2.3.0 && <2.4
-    , hedis >=0.10.4 && <0.11
+    , hedis >=0.12.8 && <0.13
     , hostname >=1.0 && <1.1
     , logging >=3.0.5 && <3.1
     , meerkat
-    , megaparsec >=6.5.0 && <6.6
+    , megaparsec >=7.0.5 && <7.1
     , optparse-applicative >=0.14 && <0.15
     , pqueue >=1.4.1.1 && <1.5
     , resource-pool >=0.2.3 && <0.3
     , scientific >=0.3.6.2 && <0.4
-    , stm >=2.4.5.0 && <2.5
+    , stm >=2.5.0.0 && <2.6
     , text >=1.2.3 && <1.3
     , time >=1.8.0.2 && <1.9
     , typed-process >=0.2.3.0 && <0.3
-    , yaml >=0.8.32 && <0.9
+    , yaml >=0.11 && <0.12
   default-language: Haskell2010

@@ -1,10 +1,10 @@
-resolver: lts-12.13
+resolver: lts-14.11
 packages:
 - .
 extra-deps:
-- beam-postgres-0.3.2.2
+- beam-postgres-0.4.0.0
 - logging-3.0.5
 nix:
   packages:
     - pkgconfig
-    - postgresql_10
+    - postgresql_11

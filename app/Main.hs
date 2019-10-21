@@ -68,7 +68,7 @@ defaultLogConfig = LogConfig Nothing Log.LevelInfo
 
 data SidekiqConfig = SidekiqConfig
   { cfgSkDatabase   :: Redis.ConnectInfo
-  , cfgSkQueues     :: [Text]
+  , cfgSkQueues     :: Text
   }
 
 instance FromJSON Config where
@@ -222,8 +222,8 @@ app Config{..} = do
     ]
 
   df <- newPeriodicJob "Check disk space usage" (diskspace msgq (cfgDF cfgBinaries) hostname) 60
-  mem <- newPeriodicJob "Check memory usage" (memory msgq (cfgFree cfgBinaries) hostname) 10
-  sk <- maybe (return Nothing) (\cfg -> Just <$> newPeriodicJob "Check sidekiq queues" (sidekiq msgq cfg) 10) cfgSidekiq
+  mem <- newPeriodicJob "Check memory usage" (memory msgq (cfgFree cfgBinaries) hostname) 20
+  sk <- maybe (return Nothing) (\cfg -> Just <$> newPeriodicJob "Check sidekiq queues" (sidekiq msgq cfg) 20) cfgSidekiq
   pidstat1 <- newPeriodicJob "Check process statistics" (pidstats msgq (cfgPidstat cfgBinaries) hostname) 120
   pidstat2 <- newPeriodicJob "Check process statistics" (pidstats msgq (cfgPidstat cfgBinaries) hostname) 120
   let queue = PQueue.fromList $ catMaybes

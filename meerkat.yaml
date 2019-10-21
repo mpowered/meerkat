@@ -9,9 +9,7 @@ database:
   database: meerkat
 sidekiq:
   database: redis://localhost/0
-  queues:
-    - production:queue:toolkit_low_priority_production
-    - production:queue:toolkit_slow_production
+  queues: production:queues
 binaries:
   df: df
   free: free
