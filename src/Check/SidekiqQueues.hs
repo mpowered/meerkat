@@ -33,8 +33,10 @@ withConn conninfo a = do
 sidekiqQueues :: Text -> Redis.ConnectInfo -> UTCTime -> ExceptT String IO [SidekiqQueue]
 sidekiqQueues env conninfo timestamp =
   withConn conninfo $ \conn -> do
-    qnames <- runRedis conn $ Redis.smembers (Text.encodeUtf8 $ env <> ":queues")
+    names <- runRedis conn $ Redis.smembers queues
+    let qnames = map queue names
     qlens <- runRedis conn $ sequence <$> mapM Redis.llen qnames
-    return $ zipWith (SidekiqQueueT timestamp) (queue <$> qnames) qlens
+    return $ zipWith (SidekiqQueueT timestamp) (Text.decodeUtf8 <$> qnames) qlens
   where
-    queue name = env <> ":queue:" <> Text.decodeUtf8 name
+    queues = Text.encodeUtf8 $ env <> ":queues"
+    queue n = Text.encodeUtf8 env <> ":queue:" <> n
