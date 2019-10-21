@@ -4,7 +4,7 @@ github:              "mpowered/meerkat"
 license:             BSD3
 author:              "Shaun Sharples"
 maintainer:          "shaun.sharples@gmail.com"
-copyright:           "2018 Shaun Sharples"
+copyright:           "2019 Shaun Sharples"
 
 extra-source-files:
 - README.md
