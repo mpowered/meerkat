@@ -20,7 +20,6 @@ import           Control.Monad
 import           Data.Pool
 import qualified Data.PQueue.Prio.Min     as PQueue
 import qualified Database.Redis           as Redis
-import           Data.Scientific
 import           Data.Text                (Text)
 import qualified Data.Text                as Text
 import           Data.Time.Clock
@@ -28,7 +27,8 @@ import           Data.Version
 import           Data.Yaml
 import           Database
 import           Database.Beam
-import           Database.Beam.Backend.SQL.SQL92
+import           Database.Beam.Backend.SQL
+import           Database.Beam.Schema.Tables
 import qualified Database.Beam.Postgres   as Pg
 import           Network.HostName         (getHostName)
 import qualified Options.Applicative      as OptParse
@@ -287,13 +287,7 @@ dbLogger msgq shutdown pool = loop initialBackoff
 type InsertValueSyntax cmd = Sql92ExpressionValueSyntax (Sql92InsertValuesExpressionSyntax (Sql92InsertValuesSyntax (Sql92InsertSyntax cmd)))
 
 diskspace
-  :: forall cmd be hdl m.
-     ( IsSql92Syntax cmd
-     , MonadBeam cmd be hdl m
-     , HasSqlValueSyntax (InsertValueSyntax cmd) Integer
-     , HasSqlValueSyntax (InsertValueSyntax cmd) Text
-     , HasSqlValueSyntax (InsertValueSyntax cmd) UTCTime
-     )
+  :: forall be m. ( BeamSqlBackend be , MonadBeam be m , FieldsFulfillConstraint (BeamSqlBackendCanSerialize be) DiskSpaceUsageT )
   => MessageQueue m
   -> FilePath
   -> Text
@@ -309,13 +303,7 @@ diskspace msgq bin hostname = do
     insertAction = runInsert . insert (dbDiskSpaceUsage db) . insertValues
 
 memory
-  :: forall cmd be hdl m.
-     ( IsSql92Syntax cmd
-     , MonadBeam cmd be hdl m
-     , HasSqlValueSyntax (InsertValueSyntax cmd) Integer
-     , HasSqlValueSyntax (InsertValueSyntax cmd) Text
-     , HasSqlValueSyntax (InsertValueSyntax cmd) UTCTime
-     )
+  :: forall be m. ( BeamSqlBackend be , MonadBeam be m , FieldsFulfillConstraint (BeamSqlBackendCanSerialize be) MemoryUsageT )
   => MessageQueue m
   -> FilePath
   -> Text
@@ -331,13 +319,7 @@ memory msgq bin hostname = do
     insertAction = runInsert . insert (dbMemoryUsage db) . insertValues
 
 sidekiq
-  :: forall cmd be hdl m.
-     ( IsSql92Syntax cmd
-     , MonadBeam cmd be hdl m
-     , HasSqlValueSyntax (InsertValueSyntax cmd) Integer
-     , HasSqlValueSyntax (InsertValueSyntax cmd) Text
-     , HasSqlValueSyntax (InsertValueSyntax cmd) UTCTime
-     )
+  :: forall be m. ( BeamSqlBackend be , MonadBeam be m , FieldsFulfillConstraint (BeamSqlBackendCanSerialize be) SidekiqQueueT )
   => MessageQueue m
   -> SidekiqConfig
   -> IO ()
@@ -352,14 +334,7 @@ sidekiq msgq SidekiqConfig{..} = do
     insertAction = runInsert . insert (dbSidekiqQueues db) . insertValues
 
 pidstats
-  :: forall cmd be hdl m.
-     ( IsSql92Syntax cmd
-     , MonadBeam cmd be hdl m
-     , HasSqlValueSyntax (InsertValueSyntax cmd) (Maybe Integer)
-     , HasSqlValueSyntax (InsertValueSyntax cmd) Text
-     , HasSqlValueSyntax (InsertValueSyntax cmd) (Maybe Scientific)
-     , HasSqlValueSyntax (InsertValueSyntax cmd) UTCTime
-     )
+  :: forall be m. ( BeamSqlBackend be , MonadBeam be m , FieldsFulfillConstraint (BeamSqlBackendCanSerialize be) ProcessStatsT )
   => MessageQueue m
   -> FilePath
   -> Text

@@ -87,5 +87,5 @@ memoryUsage bin host timestamp = do
   (stdout, _stderr) <- liftIO $ Proc.readProcess_ (free bin)
   let txt = Text.decodeUtf8 stdout
   case M.parse (parser host timestamp) "" txt of
-    Left errmsg  -> throwE (M.parseErrorPretty' txt errmsg)
+    Left errbundle -> throwE (M.errorBundlePretty errbundle)
     Right usage -> return [usage]

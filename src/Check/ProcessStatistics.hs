@@ -140,5 +140,5 @@ processes bin host = do
   now <- liftIO getCurrentTime
   let txt = Text.decodeUtf8 stdout
   case M.parse (parser host now) "" txt of
-    Left errbundle  -> throwE (M.errorBundlePretty errbundle)
+    Left errbundle -> throwE (M.errorBundlePretty errbundle)
     Right usages -> return usages
