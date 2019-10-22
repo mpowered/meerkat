@@ -12,6 +12,7 @@ where
 
 import           Control.Error
 import           Control.Exception
+import qualified Control.Logging            as Log
 import           Data.Text                  (Text)
 import qualified Data.Text.Encoding         as Text
 import           Data.Time.Clock            (UTCTime)
@@ -32,10 +33,10 @@ withConn conninfo a = do
   hoistEither e
   where
     connect ci = do
-      putStrLn "Redis.connect"
+      Log.debug "Redis.connect"
       Redis.checkedConnect ci
     disconnect conn = do
-      putStrLn "Redis.disconnect"
+      Log.debug "Redis.disconnect"
       Redis.disconnect conn
 
 sidekiqQueues :: Text -> Redis.ConnectInfo -> UTCTime -> ExceptT String IO [SidekiqQueue]
