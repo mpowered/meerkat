@@ -14,7 +14,7 @@ let
 
 in
 {
-  meerkat = drv;
+  meerkat = pkgs.haskell.lib.justStaticExecutables drv;
   meerkat-shell = haskellPackages.shellFor {
     packages = p: [drv];
   };

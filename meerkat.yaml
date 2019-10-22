@@ -1,6 +1,6 @@
 hostname: neptune
 logging:
-  # logfile: meerkat.log
+  logfile: meerkat.log
   loglevel: debug
 database:
   host: localhost
