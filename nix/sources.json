@@ -1,14 +1,14 @@
 {
     "hedis": {
-        "branch": "master",
+        "branch": "debug",
         "description": "A Redis client library for Haskell.",
         "homepage": "http://hackage.haskell.org/package/hedis",
         "owner": "bflyblue",
         "repo": "hedis",
-        "rev": "eb62c5d4b40822e5f9724918150f6105359dca24",
-        "sha256": "1gi4hfvzg1w44qrrjlsxlnb6nynv7c0svb6z6pvlk1f3fis70i85",
+        "rev": "b7d59dfb9580f878ed192dbebfd46008d69d96b4",
+        "sha256": "1wvy0f5n49r9ydsn393ilpfqaaai0s2jjxai7vj49rz0yvg5kpqn",
         "type": "tarball",
-        "url": "https://github.com/bflyblue/hedis/archive/eb62c5d4b40822e5f9724918150f6105359dca24.tar.gz",
+        "url": "https://github.com/bflyblue/hedis/archive/b7d59dfb9580f878ed192dbebfd46008d69d96b4.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "niv": {
