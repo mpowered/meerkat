@@ -8,8 +8,10 @@
 .cabal-sandbox
 .ghc.environment.*
 .stack-work
+stack.yaml.lock
 cabal.config
 cabal.project.freeze
+cabal.project.local
 cabal.sandbox.config
 dist
 dist-newstyle
@@ -17,3 +19,4 @@ hscope.out
 result
 tags
 TAGS
+meerkat.log
