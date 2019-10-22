@@ -1,16 +1,15 @@
-{ compiler ? "ghc864" }:
+{ compiler ? "ghc865" }:
 
 let
-  nixpkgs = import (builtins.fetchTarball {
-    url = https://github.com/NixOS/nixpkgs-channels/archive/nixos-19.09.tar.gz;
-  }) {};
-
-  inherit (nixpkgs) pkgs;
+  sources = import ./nix/sources.nix;
+  pkgs = import sources.nixpkgs {};
 
   haskellPackages = pkgs.haskell.packages."${compiler}";
 
   drv = haskellPackages.callCabal2nix "meerkat" ./. {
+    beam-core = with pkgs.haskell.lib; unmarkBroken (dontCheck haskellPackages.beam-core);
     beam-postgres = with pkgs.haskell.lib; unmarkBroken (dontCheck haskellPackages.beam-postgres);
+    hedis = with pkgs.haskell.lib; dontCheck (haskellPackages.callCabal2nix "hedis" sources.hedis {});
   };
 
 in
