@@ -215,7 +215,9 @@ app Config{..} = do
   hostname <- maybe (Text.pack <$> getHostName) return cfgHostname
   now <- getCurrentTime
   Log.log $ Text.unwords
-    [ "Meerkat " <> Text.pack (showVersion version) <> " started on"
+    [ "Meerkat"
+    , Text.pack (showVersion version)
+    , "started on"
     , hostname
     , "at"
     , showTxt now
