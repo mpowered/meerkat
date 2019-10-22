@@ -12,7 +12,6 @@ where
 
 import           Control.Error
 import           Control.Exception
-import qualified Control.Logging            as Log
 import           Data.Text                  (Text)
 import qualified Data.Text.Encoding         as Text
 import           Data.Time.Clock            (UTCTime)
@@ -28,16 +27,8 @@ runRedis conn r = withExceptT redisResult $ ExceptT $ Redis.runRedis conn r
 withConn :: Redis.ConnectInfo -> (Redis.Connection -> ExceptT String IO a) -> ExceptT String IO a
 withConn conninfo a = do
   e <- withExceptT show $ tryIO $
-    bracket (connect conninfo) disconnect (runExceptT . a)
-    --bracket (Redis.checkedConnect conninfo) Redis.disconnect (runExceptT . a)
+    bracket (Redis.checkedConnect conninfo) Redis.disconnect (runExceptT . a)
   hoistEither e
-  where
-    connect ci = do
-      Log.debug "Redis.connect"
-      Redis.checkedConnect ci
-    disconnect conn = do
-      Log.debug "Redis.disconnect"
-      Redis.disconnect conn
 
 sidekiqQueues :: Text -> Redis.ConnectInfo -> UTCTime -> ExceptT String IO [SidekiqQueue]
 sidekiqQueues env conninfo timestamp =
