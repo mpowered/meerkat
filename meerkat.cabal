@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.31.2.
+-- This file has been generated from package.yaml by hpack version 0.33.0.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 4f23142ed59515b194865f8edb713f27d535adceab7726326291546a30c83c08
+-- hash: 0f033749039e13a8bc2dcabe2232b52afc12b1926daa85cdb301ada65d2e7b83
 
 name:           meerkat
 version:        0.2.0.0
@@ -30,6 +30,7 @@ library
       Check.DiskSpaceUsage
       Check.MemoryUsage
       Check.ProcessStatistics
+      Check.Puma
       Check.SidekiqQueues
       Database
   other-modules:
@@ -50,6 +51,7 @@ library
     , megaparsec >=7.0 && <7.1
     , optparse-applicative >=0.14 && <0.15
     , pqueue >=1.4 && <1.5
+    , req >=2.1 && <2.2
     , resource-pool >=0.2 && <0.3
     , scientific >=0.3 && <0.4
     , stm >=2.5 && <2.6
@@ -80,6 +82,7 @@ executable meerkat
     , megaparsec >=7.0 && <7.1
     , optparse-applicative >=0.14 && <0.15
     , pqueue >=1.4 && <1.5
+    , req >=2.1 && <2.2
     , resource-pool >=0.2 && <0.3
     , scientific >=0.3 && <0.4
     , stm >=2.5 && <2.6
@@ -111,6 +114,7 @@ test-suite meerkat-test
     , megaparsec >=7.0 && <7.1
     , optparse-applicative >=0.14 && <0.15
     , pqueue >=1.4 && <1.5
+    , req >=2.1 && <2.2
     , resource-pool >=0.2 && <0.3
     , scientific >=0.3 && <0.4
     , stm >=2.5 && <2.6

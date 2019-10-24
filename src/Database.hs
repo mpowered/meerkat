@@ -19,6 +19,7 @@ data DB f = DB
   , dbMemoryUsage    :: f (TableEntity MemoryUsageT)
   , dbProcessStats   :: f (TableEntity ProcessStatsT)
   , dbSidekiqQueues  :: f (TableEntity SidekiqQueueT)
+  , dbPuma           :: f (TableEntity PumaT)
   } deriving Generic
 
 instance Database be DB
@@ -99,3 +100,20 @@ instance Table SidekiqQueueT where
 
 type SidekiqQueue = SidekiqQueueT Identity
 deriving instance Show SidekiqQueue
+
+data PumaT f = PumaT
+  { pTime         :: C f UTCTime
+  , pHost         :: C f Text
+  , pWorker       :: C f Integer
+  , pBacklog      :: C f Integer
+  , pRunning      :: C f Integer
+  , pPoolCapacity :: C f Integer
+  , pMaxThreads   :: C f Integer
+  } deriving (Generic, Beamable)
+
+instance Table PumaT where
+  data PrimaryKey PumaT f = PumaKey (C f UTCTime) (C f Text) (C f Integer) deriving (Generic, Beamable)
+  primaryKey = PumaKey <$> pTime <*> pHost <*> pWorker
+
+type Puma = PumaT Identity
+deriving instance Show Puma

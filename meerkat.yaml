@@ -14,3 +14,6 @@ binaries:
   df: df
   free: free
   pidstat: pidstat
+puma:
+  url: http://localhost:9292/stats
+  token: secret

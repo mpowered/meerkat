@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-orphans       #-}
+{-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
@@ -31,11 +33,13 @@ import           Database.Beam.Backend.SQL
 import           Database.Beam.Schema.Tables
 import qualified Database.Beam.Postgres   as Pg
 import           Network.HostName         (getHostName)
+import qualified Network.HTTP.Req         as Req
 import qualified Options.Applicative      as OptParse
 import           Options.Applicative      ((<**>))
 
 import           Check.DiskSpaceUsage
 import           Check.MemoryUsage
+import           Check.Puma
 import           Check.ProcessStatistics
 import           Check.SidekiqQueues
 
@@ -47,6 +51,7 @@ data Config = Config
   , cfgDatabase     :: Pg.ConnectInfo
   , cfgBinaries     :: BinConfig
   , cfgSidekiq      :: Maybe SidekiqConfig
+  , cfgPuma         :: Maybe PumaConfig
   }
 
 data BinConfig = BinConfig
@@ -71,6 +76,10 @@ data SidekiqConfig = SidekiqConfig
   , cfgSkQueues     :: Text
   }
 
+data PumaConfig = PumaConfig
+  { cfgPumaCtl      :: PumaCtl
+  }
+
 instance FromJSON Config where
   parseJSON = withObject "Config" $ \o ->
     Config
@@ -79,6 +88,7 @@ instance FromJSON Config where
       <*> o .:  "database"
       <*> o .:? "binaries" .!= defaultBinConfig
       <*> o .:? "sidekiq"
+      <*> o .:? "puma"
 
 instance FromJSON LogConfig where
   parseJSON = withObject "LogConfig" $ \o ->
@@ -98,6 +108,12 @@ instance FromJSON SidekiqConfig where
     SidekiqConfig
       <$> o .:  "database"
       <*> o .:  "queues"
+
+instance FromJSON PumaConfig where
+  parseJSON = withObject "PumaConfig" $ \o -> do
+    PumaCtl url opt <- o .: "url"
+    token <- o .: "token"
+    return $ PumaConfig (PumaCtl url (opt <> "token" Req.=: (token::Text)))
 
 -- Orphan
 instance FromJSON Pg.ConnectInfo where
@@ -226,12 +242,14 @@ app Config{..} = do
   df <- newPeriodicJob "Check disk space usage" (diskspace msgq (cfgDF cfgBinaries) hostname) 60
   mem <- newPeriodicJob "Check memory usage" (memory msgq (cfgFree cfgBinaries) hostname) 20
   sk <- maybe (return Nothing) (\cfg -> Just <$> newPeriodicJob "Check sidekiq queues" (sidekiq msgq cfg) 20) cfgSidekiq
+  p <- maybe (return Nothing) (\cfg -> Just <$> newPeriodicJob "Check sidekiq queues" (puma msgq (cfgPumaCtl cfg) hostname) 20) cfgPuma
   pidstat1 <- newPeriodicJob "Check process statistics" (pidstats msgq (cfgPidstat cfgBinaries) hostname) 120
   pidstat2 <- newPeriodicJob "Check process statistics" (pidstats msgq (cfgPidstat cfgBinaries) hostname) 120
   let queue = PQueue.fromList $ catMaybes
                 [ Just (now, df)
                 , Just (now, mem)
                 , (now, ) <$> sk
+                , (now, ) <$> p
                 -- run two instances of pidstat, each triggered every 2 mins
                 -- each one is expected to collect stats for 1 minute
                 , Just (now, pidstat1)
@@ -349,6 +367,22 @@ pidstats msgq bin hostname =
   where
     insertAction :: [ProcessStats] -> m ()
     insertAction = runInsert . insert (dbProcessStats db) . insertValues
+
+puma
+  :: forall be m. ( BeamSqlBackend be , MonadBeam be m , FieldsFulfillConstraint (BeamSqlBackendCanSerialize be) PumaT )
+  => MessageQueue m
+  -> PumaCtl
+  -> Text
+  -> IO ()
+puma msgq ctl hostname = do
+  now <- getCurrentTime
+  exceptT
+    print
+    (atomically . sendMessage msgq . SampleData . insertAction)
+    (pumaStats ctl hostname now)
+  where
+    insertAction :: [Puma] -> m ()
+    insertAction = runInsert . insert (dbPuma db) . insertValues
 
 runScheduler :: Scheduler -> IO ()
 runScheduler scheduler =
