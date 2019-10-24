@@ -242,7 +242,7 @@ app Config{..} = do
   df <- newPeriodicJob "Check disk space usage" (diskspace msgq (cfgDF cfgBinaries) hostname) 60
   mem <- newPeriodicJob "Check memory usage" (memory msgq (cfgFree cfgBinaries) hostname) 20
   sk <- maybe (return Nothing) (\cfg -> Just <$> newPeriodicJob "Check sidekiq queues" (sidekiq msgq cfg) 20) cfgSidekiq
-  p <- maybe (return Nothing) (\cfg -> Just <$> newPeriodicJob "Check sidekiq queues" (puma msgq (cfgPumaCtl cfg) hostname) 20) cfgPuma
+  p <- maybe (return Nothing) (\cfg -> Just <$> newPeriodicJob "Poll Puma statistics" (puma msgq (cfgPumaCtl cfg) hostname) 20) cfgPuma
   pidstat1 <- newPeriodicJob "Check process statistics" (pidstats msgq (cfgPidstat cfgBinaries) hostname) 120
   pidstat2 <- newPeriodicJob "Check process statistics" (pidstats msgq (cfgPidstat cfgBinaries) hostname) 120
   let queue = PQueue.fromList $ catMaybes
