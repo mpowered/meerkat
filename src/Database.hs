@@ -104,6 +104,7 @@ deriving instance Show SidekiqQueue
 
 data SidekiqJobsT f = SidekiqJobsT
   { sjTime        :: C f UTCTime
+  , sjQueue       :: C f Text
   , sjClass       :: C f Text
   , sjLength      :: C f Integer
   , sjEnqueuedFor :: C f Double

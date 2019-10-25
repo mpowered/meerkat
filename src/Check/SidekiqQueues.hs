@@ -22,9 +22,9 @@ import           Data.Time.Clock.POSIX      (POSIXTime, posixSecondsToUTCTime)
 import           Database
 import qualified Database.Redis             as Redis
 
-type Class = Text
+type QueueClass = (Text,Text)
 
-newtype JobsStats = JobsStats (HM.HashMap Class ClassStats)
+newtype JobsStats = JobsStats (HM.HashMap QueueClass ClassStats)
 
 instance Semigroup JobsStats where
   JobsStats a <> JobsStats b = JobsStats $ HM.unionWith (<>) a b
@@ -44,7 +44,7 @@ instance Monoid ClassStats where
   mempty = ClassStats 0 0
 
 data Job = Job
-  { jobClass        :: Class
+  { jobClass        :: Text
   -- , jobArgs         :: Value
   -- , jobCreatedAt    :: UTCTime
   , jobEnqueuedAt   :: UTCTime
@@ -89,19 +89,23 @@ sidekiqJobs env conninfo timestamp =
     names <- runRedis conn $ Redis.smembers queues
     let qnames = map queue names
     jobs <- runRedis conn $ sequence <$> mapM (\q -> Redis.lrange q 0 (-1)) qnames
-    let JobsStats stats = mconcat $ map (maybe mempty (jobStats timestamp) . Aeson.decodeStrict') (concat jobs)
+    let JobsStats stats =
+          mconcat [ maybe mempty (jobStats timestamp q) (Aeson.decodeStrict' j)
+                  | (q, js) <- zip (Text.decodeUtf8 <$> qnames) jobs
+                  , j <- js ]
     return $ map (uncurry mkSidekiqJob) (HM.toList stats)
   where
     queues = Text.encodeUtf8 $ env <> ":queues"
     queue n = Text.encodeUtf8 env <> ":queue:" <> n
 
-    mkSidekiqJob cls stat =
+    mkSidekiqJob (q,cls) stat =
       SidekiqJobsT
         { sjTime = timestamp
+        , sjQueue = q
         , sjClass = cls
         , sjLength = classNumJobs stat
         , sjEnqueuedFor = realToFrac (classTotalAge stat)
         }
 
-jobStats :: UTCTime -> Job -> JobsStats
-jobStats now j = JobsStats $ HM.singleton (jobClass j) (ClassStats 1 (diffUTCTime now (jobEnqueuedAt j)))
+jobStats :: UTCTime -> Text -> Job -> JobsStats
+jobStats now q j = JobsStats $ HM.singleton (q,jobClass j) (ClassStats 1 (diffUTCTime now (jobEnqueuedAt j)))
