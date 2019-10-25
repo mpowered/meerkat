@@ -19,6 +19,7 @@ data DB f = DB
   , dbMemoryUsage    :: f (TableEntity MemoryUsageT)
   , dbProcessStats   :: f (TableEntity ProcessStatsT)
   , dbSidekiqQueues  :: f (TableEntity SidekiqQueueT)
+  , dbSidekiqJobs    :: f (TableEntity SidekiqJobsT)
   , dbPuma           :: f (TableEntity PumaT)
   } deriving Generic
 
@@ -100,6 +101,20 @@ instance Table SidekiqQueueT where
 
 type SidekiqQueue = SidekiqQueueT Identity
 deriving instance Show SidekiqQueue
+
+data SidekiqJobsT f = SidekiqJobsT
+  { sjTime        :: C f UTCTime
+  , sjClass       :: C f Text
+  , sjLength      :: C f Integer
+  , sjEnqueuedFor :: C f Double
+  } deriving (Generic, Beamable)
+
+instance Table SidekiqJobsT where
+  data PrimaryKey SidekiqJobsT f = SidekiqJobKey (C f UTCTime) (C f Text) deriving (Generic, Beamable)
+  primaryKey = SidekiqJobKey <$> sjTime <*> sjClass
+
+type SidekiqJobs = SidekiqJobsT Identity
+deriving instance Show SidekiqJobs
 
 data PumaT f = PumaT
   { pTime         :: C f UTCTime

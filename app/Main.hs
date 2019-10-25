@@ -239,16 +239,18 @@ app Config{..} = do
     , showTxt now
     ]
 
-  df <- newPeriodicJob "Check disk space usage" (diskspace msgq (cfgDF cfgBinaries) hostname) 60
+  df  <- newPeriodicJob "Check disk space usage" (diskspace msgq (cfgDF cfgBinaries) hostname) 60
   mem <- newPeriodicJob "Check memory usage" (memory msgq (cfgFree cfgBinaries) hostname) 20
-  sk <- maybe (return Nothing) (\cfg -> Just <$> newPeriodicJob "Check sidekiq queues" (sidekiq msgq cfg) 20) cfgSidekiq
-  p <- maybe (return Nothing) (\cfg -> Just <$> newPeriodicJob "Poll Puma statistics" (puma msgq (cfgPumaCtl cfg) hostname) 20) cfgPuma
+  sk  <- maybe (return Nothing) (\cfg -> Just <$> newPeriodicJob "Check sidekiq queues" (sidekiq msgq cfg) 20) cfgSidekiq
+  skj <- maybe (return Nothing) (\cfg -> Just <$> newPeriodicJob "Inspect sidekiq jobs" (skJobs msgq cfg) 60) cfgSidekiq
+  p   <- maybe (return Nothing) (\cfg -> Just <$> newPeriodicJob "Poll Puma statistics" (puma msgq (cfgPumaCtl cfg) hostname) 20) cfgPuma
   pidstat1 <- newPeriodicJob "Check process statistics" (pidstats msgq (cfgPidstat cfgBinaries) hostname) 120
   pidstat2 <- newPeriodicJob "Check process statistics" (pidstats msgq (cfgPidstat cfgBinaries) hostname) 120
   let queue = PQueue.fromList $ catMaybes
                 [ Just (now, df)
                 , Just (now, mem)
                 , (now, ) <$> sk
+                , (now, ) <$> skj
                 , (now, ) <$> p
                 -- run two instances of pidstat, each triggered every 2 mins
                 -- each one is expected to collect stats for 1 minute
@@ -352,6 +354,21 @@ sidekiq msgq SidekiqConfig{..} = do
   where
     insertAction :: [SidekiqQueue] -> m ()
     insertAction = runInsert . insert (dbSidekiqQueues db) . insertValues
+
+skJobs
+  :: forall be m. ( BeamSqlBackend be , MonadBeam be m , FieldsFulfillConstraint (BeamSqlBackendCanSerialize be) SidekiqJobsT )
+  => MessageQueue m
+  -> SidekiqConfig
+  -> IO ()
+skJobs msgq SidekiqConfig{..} = do
+  now <- getCurrentTime
+  exceptT
+    print
+    (atomically . sendMessage msgq . SampleData . insertAction)
+    (sidekiqJobs cfgSkQueues cfgSkDatabase now)
+  where
+    insertAction :: [SidekiqJobs] -> m ()
+    insertAction = runInsert . insert (dbSidekiqJobs db) . insertValues
 
 pidstats
   :: forall be m. ( BeamSqlBackend be , MonadBeam be m , FieldsFulfillConstraint (BeamSqlBackendCanSerialize be) ProcessStatsT )
