@@ -18,6 +18,7 @@ import qualified Data.HashMap.Strict        as HM
 import           Data.Text                  (Text)
 import qualified Data.Text.Encoding         as Text
 import           Data.Time.Clock            (UTCTime, NominalDiffTime, diffUTCTime)
+import           Data.Time.Clock.POSIX      (POSIXTime, posixSecondsToUTCTime)
 import           Database
 import qualified Database.Redis             as Redis
 
@@ -55,7 +56,9 @@ instance FromJSON Job where
       <$> o .: "class"
       -- <*> o .: "args"
       -- <*> o .: "created_at"
-      <*> o .: "enqueued_at"
+      <*> (parseDate <$> o .: "enqueued_at")
+    where
+      parseDate = posixSecondsToUTCTime . (realToFrac :: Double -> POSIXTime) . read
 
 runRedis :: Redis.Connection -> Redis.Redis (Either Redis.Reply a) -> ExceptT String IO a
 runRedis conn r = withExceptT redisResult $ ExceptT $ Redis.runRedis conn r
