@@ -16,6 +16,7 @@ import           Control.Exception
 import           Data.Aeson                 as Aeson
 import qualified Data.HashMap.Strict        as HM
 import           Data.Text                  (Text)
+import qualified Data.Text                  as Text
 import qualified Data.Text.Encoding         as Text
 import           Data.Time.Clock            (UTCTime, NominalDiffTime, diffUTCTime)
 import           Data.Time.Clock.POSIX      (POSIXTime, posixSecondsToUTCTime)
@@ -56,9 +57,11 @@ instance FromJSON Job where
       <$> o .: "class"
       -- <*> o .: "args"
       -- <*> o .: "created_at"
-      <*> (parseDate <$> o .: "enqueued_at")
+      <*> (o .: "enqueued_at" >>= parseDate)
     where
-      parseDate = posixSecondsToUTCTime . (realToFrac :: Double -> POSIXTime) . read
+      parseDate (Aeson.String s) = return $ posixSecondsToUTCTime $ (realToFrac :: Double -> POSIXTime) $ read $ Text.unpack s
+      parseDate (Aeson.Number n) = return $ posixSecondsToUTCTime $ realToFrac n
+      parseDate _                = error "Not a valid date"
 
 runRedis :: Redis.Connection -> Redis.Redis (Either Redis.Reply a) -> ExceptT String IO a
 runRedis conn r = withExceptT redisResult $ ExceptT $ Redis.runRedis conn r
