@@ -1,5 +1,10 @@
 # Changelog for meerkat
 
+## 0.2.3.0
+
+### Changed
+- Only open one Redis connection (Hedis uses a connpool)
+
 ## 0.2.2.0
 
 ### Added

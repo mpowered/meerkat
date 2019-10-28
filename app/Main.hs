@@ -241,11 +241,10 @@ app Config{..} = do
 
   df  <- newPeriodicJob "Check disk space usage" (diskspace msgq (cfgDF cfgBinaries) hostname) 60
   mem <- newPeriodicJob "Check memory usage" (memory msgq (cfgFree cfgBinaries) hostname) 20
-  sk  <- maybe (return Nothing) (\cfg -> Just <$> newPeriodicJob "Check sidekiq queues" (sidekiq msgq cfg) 20) cfgSidekiq
-  skj <- maybe (return Nothing) (\cfg -> Just <$> newPeriodicJob "Inspect sidekiq jobs" (skJobs msgq cfg) 60) cfgSidekiq
-  p   <- maybe (return Nothing) (\cfg -> Just <$> newPeriodicJob "Poll Puma statistics" (puma msgq (cfgPumaCtl cfg) hostname) 20) cfgPuma
+  p   <- traverse (\cfg -> newPeriodicJob "Poll Puma statistics" (puma msgq (cfgPumaCtl cfg) hostname) 20) cfgPuma
   pidstat1 <- newPeriodicJob "Check process statistics" (pidstats msgq (cfgPidstat cfgBinaries) hostname) 120
   pidstat2 <- newPeriodicJob "Check process statistics" (pidstats msgq (cfgPidstat cfgBinaries) hostname) 120
+  (sk, skj) <- newSkJobs msgq cfgSidekiq
   let queue = PQueue.fromList $ catMaybes
                 [ Just (now, df)
                 , Just (now, mem)
@@ -267,6 +266,17 @@ app Config{..} = do
   atomically $ writeTVar shutdown True
   Log.log "Waiting for database logger to complete"
   void $ wait logger
+
+  where
+    newSkJobs msgq = 
+      maybe
+          (return (Nothing, Nothing)) 
+          (\cfg -> do
+            conn <- Redis.connect (cfgSkDatabase cfg)
+            sk <- newPeriodicJob "Check sidekiq queues" (sidekiq msgq conn cfg) 20
+            skj <- newPeriodicJob "Inspect sidekiq jobs" (skJobs msgq conn cfg) 20
+            return (Just sk, Just skj)
+          )
 
 data LoggerResult
   = LoggerContinue
@@ -343,14 +353,15 @@ memory msgq bin hostname = do
 sidekiq
   :: forall be m. ( BeamSqlBackend be , MonadBeam be m , FieldsFulfillConstraint (BeamSqlBackendCanSerialize be) SidekiqQueueT )
   => MessageQueue m
+  -> Redis.Connection
   -> SidekiqConfig
   -> IO ()
-sidekiq msgq SidekiqConfig{..} = do
+sidekiq msgq conn SidekiqConfig{..} = do
   now <- getCurrentTime
   exceptT
     print
     (atomically . sendMessage msgq . SampleData . insertAction)
-    (sidekiqQueues cfgSkQueues cfgSkDatabase now)
+    (sidekiqQueues cfgSkQueues conn now)
   where
     insertAction :: [SidekiqQueue] -> m ()
     insertAction = runInsert . insert (dbSidekiqQueues db) . insertValues
@@ -358,14 +369,15 @@ sidekiq msgq SidekiqConfig{..} = do
 skJobs
   :: forall be m. ( BeamSqlBackend be , MonadBeam be m , FieldsFulfillConstraint (BeamSqlBackendCanSerialize be) SidekiqJobsT )
   => MessageQueue m
+  -> Redis.Connection
   -> SidekiqConfig
   -> IO ()
-skJobs msgq SidekiqConfig{..} = do
+skJobs msgq conn SidekiqConfig{..} = do
   now <- getCurrentTime
   exceptT
     print
     (atomically . sendMessage msgq . SampleData . insertAction)
-    (sidekiqJobs cfgSkQueues cfgSkDatabase now)
+    (sidekiqJobs cfgSkQueues conn now)
   where
     insertAction :: [SidekiqJobs] -> m ()
     insertAction = runInsert . insert (dbSidekiqJobs db) . insertValues
