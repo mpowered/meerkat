@@ -21,6 +21,7 @@ data DB f = DB
   , dbSidekiqQueues  :: f (TableEntity SidekiqQueueT)
   , dbSidekiqJobs    :: f (TableEntity SidekiqJobsT)
   , dbPuma           :: f (TableEntity PumaT)
+  , dbHoneybadger    :: f (TableEntity HoneybadgerT)
   } deriving Generic
 
 instance Database be DB
@@ -133,3 +134,16 @@ instance Table PumaT where
 
 type Puma = PumaT Identity
 deriving instance Show Puma
+
+data HoneybadgerT f = HoneybadgerT
+  { hbTime        :: C f UTCTime
+  , hbEnvironment :: C f Text
+  , hbFaults      :: C f Integer
+  } deriving (Generic, Beamable)
+
+instance Table HoneybadgerT where
+  data PrimaryKey HoneybadgerT f = HoneybadgerKey (C f UTCTime) (C f Text) deriving (Generic, Beamable)
+  primaryKey = HoneybadgerKey <$> hbTime <*> hbEnvironment
+
+type Honeybadger = HoneybadgerT Identity
+deriving instance Show Honeybadger

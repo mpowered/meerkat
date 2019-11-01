@@ -19,11 +19,13 @@ import           Control.Error
 import           Control.Exception
 import qualified Control.Logging          as Log
 import           Control.Monad
+import           Data.ByteString          (ByteString)
 import           Data.Pool
 import qualified Data.PQueue.Prio.Min     as PQueue
 import qualified Database.Redis           as Redis
 import           Data.Text                (Text)
 import qualified Data.Text                as Text
+import qualified Data.Text.Encoding       as Text
 import           Data.Time.Clock
 import           Data.Version
 import           Data.Yaml
@@ -38,6 +40,7 @@ import qualified Options.Applicative      as OptParse
 import           Options.Applicative      ((<**>))
 
 import           Check.DiskSpaceUsage
+import           Check.Honeybadger
 import           Check.MemoryUsage
 import           Check.Puma
 import           Check.ProcessStatistics
@@ -52,6 +55,7 @@ data Config = Config
   , cfgBinaries     :: BinConfig
   , cfgSidekiq      :: Maybe SidekiqConfig
   , cfgPuma         :: Maybe PumaConfig
+  , cfgHoneybadger  :: Maybe HoneybadgerConfig
   }
 
 data BinConfig = BinConfig
@@ -80,6 +84,12 @@ data PumaConfig = PumaConfig
   { cfgPumaCtl      :: PumaCtl
   }
 
+data HoneybadgerConfig = HoneybadgerConfig
+  { cfgHBProjectId    :: Integer
+  , cfgHBEnvironment  :: Text
+  , cfgHBAuthToken    :: ByteString
+  }
+
 instance FromJSON Config where
   parseJSON = withObject "Config" $ \o ->
     Config
@@ -89,6 +99,7 @@ instance FromJSON Config where
       <*> o .:? "binaries" .!= defaultBinConfig
       <*> o .:? "sidekiq"
       <*> o .:? "puma"
+      <*> o .:? "honeybadger"
 
 instance FromJSON LogConfig where
   parseJSON = withObject "LogConfig" $ \o ->
@@ -114,6 +125,13 @@ instance FromJSON PumaConfig where
     PumaCtl url opt <- o .: "url"
     token <- o .: "token"
     return $ PumaConfig (PumaCtl url (opt <> "token" Req.=: (token::Text)))
+
+instance FromJSON HoneybadgerConfig where
+  parseJSON = withObject "HoneybadgerConfig" $ \o ->
+    HoneybadgerConfig
+      <$> o .:  "project_id"
+      <*> o .:  "environment"
+      <*> (Text.encodeUtf8 <$> o .:  "auth_token")
 
 -- Orphan
 instance FromJSON Pg.ConnectInfo where
@@ -242,6 +260,7 @@ app Config{..} = do
   df  <- newPeriodicJob "Check disk space usage" (diskspace msgq (cfgDF cfgBinaries) hostname) 60
   mem <- newPeriodicJob "Check memory usage" (memory msgq (cfgFree cfgBinaries) hostname) 20
   p   <- traverse (\cfg -> newPeriodicJob "Poll Puma statistics" (puma msgq (cfgPumaCtl cfg) hostname) 20) cfgPuma
+  hb  <- traverse (\cfg -> newPeriodicJob "Poll Honeybadger" (honeybadger msgq cfg) 600) cfgHoneybadger
   pidstat1 <- newPeriodicJob "Check process statistics" (pidstats msgq (cfgPidstat cfgBinaries) hostname) 120
   pidstat2 <- newPeriodicJob "Check process statistics" (pidstats msgq (cfgPidstat cfgBinaries) hostname) 120
   (sk, skj) <- newSkJobs msgq cfgSidekiq
@@ -251,6 +270,7 @@ app Config{..} = do
                 , (now, ) <$> sk
                 , (now, ) <$> skj
                 , (now, ) <$> p
+                , (now, ) <$> hb
                 -- run two instances of pidstat, each triggered every 2 mins
                 -- each one is expected to collect stats for 1 minute
                 , Just (now, pidstat1)
@@ -412,6 +432,21 @@ puma msgq ctl hostname = do
   where
     insertAction :: [Puma] -> m ()
     insertAction = runInsert . insert (dbPuma db) . insertValues
+
+honeybadger
+  :: forall be m. ( BeamSqlBackend be , MonadBeam be m , FieldsFulfillConstraint (BeamSqlBackendCanSerialize be) HoneybadgerT )
+  => MessageQueue m
+  -> HoneybadgerConfig
+  -> IO ()
+honeybadger msgq HoneybadgerConfig{..} = do
+  now <- getCurrentTime
+  exceptT
+    print
+    (atomically . sendMessage msgq . SampleData . insertAction)
+    (honeybadgerFaults cfgHBProjectId cfgHBEnvironment cfgHBAuthToken now)
+  where
+    insertAction :: [Honeybadger] -> m ()
+    insertAction = runInsert . insert (dbHoneybadger db) . insertValues
 
 runScheduler :: Scheduler -> IO ()
 runScheduler scheduler =

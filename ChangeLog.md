@@ -1,5 +1,8 @@
 # Changelog for meerkat
 
+## 0.2.4.0
+- Poll Honeybadger for total faults for a project environment
+
 ## 0.2.3.0
 
 ### Changed

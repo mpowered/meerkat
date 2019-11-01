@@ -4,10 +4,10 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: c7cead306ef11ef2c1bfdcd9158aa37c654d81ef5d8b267810d32874b2e6db7e
+-- hash: 537eae7cc00199228210a24f81e2d6fee758feeab56083d884007068c3929d74
 
 name:           meerkat
-version:        0.2.3.0
+version:        0.2.4.0
 description:    Please see the README on GitHub at <https://github.com/mpowered/meerkat#readme>
 homepage:       https://github.com/mpowered/meerkat#readme
 bug-reports:    https://github.com/mpowered/meerkat/issues
@@ -28,6 +28,7 @@ source-repository head
 library
   exposed-modules:
       Check.DiskSpaceUsage
+      Check.Honeybadger
       Check.MemoryUsage
       Check.ProcessStatistics
       Check.Puma
