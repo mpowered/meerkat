@@ -1,23 +1,3 @@
-{-
-
-neptune ~ % curl -u $AUTH_TOKEN: "https://app.honeybadger.io/v2/projects/55847/faults/summary?q=-is:resolved+-is:ignored+environment:production" | jq .
-  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                 Dload  Upload   Total   Spent    Left  Speed
-100   104    0   104    0     0     87      0 --:--:--  0:00:01 --:--:--    87
-{
-  "environments": [
-    {
-      "environment": "production",
-      "resolved": false,
-      "ignored": false,
-      "count": 326
-    }
-  ],
-  "total": 326
-}
-
--}
-
 {-# LANGUAGE FlexibleContexts   #-}
 {-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE OverloadedStrings  #-}
