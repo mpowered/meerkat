@@ -1,6 +1,13 @@
 # Changelog for meerkat
 
+## 0.2.4.1
+
+### Fixed
+- Use spaces not + for Honeybadger query
+
 ## 0.2.4.0
+
+### Added
 - Poll Honeybadger for total faults for a project environment
 
 ## 0.2.3.0

@@ -34,7 +34,7 @@ honeybadgerFaults projectId env token timestamp = do
         (https "app.honeybadger.io" /: "v2" /: "projects" /~ projectId /: "faults" /: "summary")
         NoReqBody
         jsonResponse
-        (  "q" =: ("-is:resolved+-is:ignored+environment:" <> env)
+        (  "q" =: ("-is:resolved -is:ignored environment:" <> env)
         <> basicAuth token ""
         )
   return [ HoneybadgerT { hbTime        = timestamp
