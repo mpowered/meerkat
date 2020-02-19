@@ -7,13 +7,15 @@ database:
   user: meerkat
   password: meerkat
   database: meerkat
-sidekiq:
-  database: redis://localhost/0
-  queues: production
 binaries:
   df: df
   free: free
   pidstat: pidstat
+sidekiq:
+  database: redis://localhost/0
+  queues: production
+importer:
+  path: import
 puma:
   url: http://localhost:9292/stats
   token: secret

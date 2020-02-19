@@ -17,15 +17,15 @@ import           Control.Concurrent.Async
 import           Control.Concurrent.STM
 import           Control.Error
 import           Control.Exception
-import qualified Control.Logging          as Log
+import qualified Control.Logging              as Log
 import           Control.Monad
-import           Data.ByteString          (ByteString)
+import           Data.ByteString              (ByteString)
 import           Data.Pool
-import qualified Data.PQueue.Prio.Min     as PQueue
-import qualified Database.Redis           as Redis
-import           Data.Text                (Text)
-import qualified Data.Text                as Text
-import qualified Data.Text.Encoding       as Text
+import qualified Data.PQueue.Prio.Min         as PQueue
+import qualified Database.Redis               as Redis
+import           Data.Text                    (Text)
+import qualified Data.Text                    as Text
+import qualified Data.Text.Encoding           as Text
 import           Data.Time.Clock
 import           Data.Version
 import           Data.Yaml
@@ -33,14 +33,16 @@ import           Database
 import           Database.Beam
 import           Database.Beam.Backend.SQL
 import           Database.Beam.Schema.Tables
-import qualified Database.Beam.Postgres   as Pg
-import           Network.HostName         (getHostName)
-import qualified Network.HTTP.Req         as Req
-import qualified Options.Applicative      as OptParse
-import           Options.Applicative      ((<**>))
+import qualified Database.Beam.Postgres       as Pg
+import qualified Database.Beam.Postgres.Full  as Pg
+import           Network.HostName             (getHostName)
+import qualified Network.HTTP.Req             as Req
+import qualified Options.Applicative          as OptParse
+import           Options.Applicative          ((<**>))
 
 import           Check.DiskSpaceUsage
 import           Check.Honeybadger
+import           Check.Importer
 import           Check.MemoryUsage
 import           Check.Puma
 import           Check.ProcessStatistics
@@ -56,6 +58,7 @@ data Config = Config
   , cfgSidekiq      :: Maybe SidekiqConfig
   , cfgPuma         :: Maybe PumaConfig
   , cfgHoneybadger  :: Maybe HoneybadgerConfig
+  , cfgImporter     :: Maybe ImporterConfig
   }
 
 data BinConfig = BinConfig
@@ -90,6 +93,10 @@ data HoneybadgerConfig = HoneybadgerConfig
   , cfgHBAuthToken    :: ByteString
   }
 
+data ImporterConfig = ImporterConfig
+  { cfgIPath          :: FilePath
+  }
+
 instance FromJSON Config where
   parseJSON = withObject "Config" $ \o ->
     Config
@@ -100,6 +107,7 @@ instance FromJSON Config where
       <*> o .:? "sidekiq"
       <*> o .:? "puma"
       <*> o .:? "honeybadger"
+      <*> o .:? "importer"
 
 instance FromJSON LogConfig where
   parseJSON = withObject "LogConfig" $ \o ->
@@ -132,6 +140,11 @@ instance FromJSON HoneybadgerConfig where
       <$> o .:  "project_id"
       <*> o .:  "environment"
       <*> (Text.encodeUtf8 <$> o .:  "auth_token")
+
+instance FromJSON ImporterConfig where
+  parseJSON = withObject "ImporterConfig" $ \o ->
+    ImporterConfig
+      <$> o .:  "path"
 
 -- Orphan
 instance FromJSON Pg.ConnectInfo where
@@ -261,16 +274,17 @@ app Config{..} = do
   mem <- newPeriodicJob "Check memory usage" (memory msgq (cfgFree cfgBinaries) hostname) 20
   p   <- traverse (\cfg -> newPeriodicJob "Poll Puma statistics" (puma msgq (cfgPumaCtl cfg) hostname) 20) cfgPuma
   hb  <- traverse (\cfg -> newPeriodicJob "Poll Honeybadger" (honeybadger msgq cfg) 600) cfgHoneybadger
+  i   <- traverse (\cfg -> newPeriodicJob "Importer" (importer msgq cfg) 60) cfgImporter
   pidstat1 <- newPeriodicJob "Check process statistics" (pidstats msgq (cfgPidstat cfgBinaries) hostname) 120
   pidstat2 <- newPeriodicJob "Check process statistics" (pidstats msgq (cfgPidstat cfgBinaries) hostname) 120
-  (sk, skj) <- newSkJobs msgq cfgSidekiq
+  sk  <- traverse (\cfg -> newSkJobs msgq cfg) cfgSidekiq
   let queue = PQueue.fromList $ catMaybes
                 [ Just (now, df)
                 , Just (now, mem)
                 , (now, ) <$> sk
-                , (now, ) <$> skj
                 , (now, ) <$> p
                 , (now, ) <$> hb
+                , (now, ) <$> i
                 -- run two instances of pidstat, each triggered every 2 mins
                 -- each one is expected to collect stats for 1 minute
                 , Just (now, pidstat1)
@@ -288,15 +302,9 @@ app Config{..} = do
   void $ wait logger
 
   where
-    newSkJobs msgq = 
-      maybe
-          (return (Nothing, Nothing)) 
-          (\cfg -> do
-            conn <- Redis.connect (cfgSkDatabase cfg)
-            sk <- newPeriodicJob "Check sidekiq queues" (sidekiq msgq conn cfg) 20
-            skj <- newPeriodicJob "Inspect sidekiq jobs" (skJobs msgq conn cfg) 20
-            return (Just sk, Just skj)
-          )
+    newSkJobs msgq cfg = do
+      conn <- Redis.connect (cfgSkDatabase cfg)
+      newPeriodicJob "Check sidekiq queues" (sidekiq msgq conn cfg) 20
 
 data LoggerResult
   = LoggerContinue
@@ -386,22 +394,6 @@ sidekiq msgq conn SidekiqConfig{..} = do
     insertAction :: [SidekiqQueue] -> m ()
     insertAction = runInsert . insert (dbSidekiqQueues db) . insertValues
 
-skJobs
-  :: forall be m. ( BeamSqlBackend be , MonadBeam be m , FieldsFulfillConstraint (BeamSqlBackendCanSerialize be) SidekiqJobsT )
-  => MessageQueue m
-  -> Redis.Connection
-  -> SidekiqConfig
-  -> IO ()
-skJobs msgq conn SidekiqConfig{..} = do
-  now <- getCurrentTime
-  exceptT
-    print
-    (atomically . sendMessage msgq . SampleData . insertAction)
-    (sidekiqJobs cfgSkQueues conn now)
-  where
-    insertAction :: [SidekiqJobs] -> m ()
-    insertAction = runInsert . insert (dbSidekiqJobs db) . insertValues
-
 pidstats
   :: forall be m. ( BeamSqlBackend be , MonadBeam be m , FieldsFulfillConstraint (BeamSqlBackendCanSerialize be) ProcessStatsT )
   => MessageQueue m
@@ -447,6 +439,28 @@ honeybadger msgq HoneybadgerConfig{..} = do
   where
     insertAction :: [Honeybadger] -> m ()
     insertAction = runInsert . insert (dbHoneybadger db) . insertValues
+
+importer
+  :: MessageQueue Pg.Pg
+  -> ImporterConfig
+  -> IO ()
+importer msgq ImporterConfig{..} =
+  exceptT
+    print
+    (atomically . sendMessage msgq . SampleData . insertAction)
+    (importEntries cfgIPath)
+  where
+    insertAction :: [Entry] -> Pg.Pg ()
+    insertAction = mapM_ insertEntry
+
+    insertEntry :: Entry -> Pg.Pg ()
+    insertEntry (ActionControllerEntry e) =
+      runInsert $ insert (dbActionController db)
+                $ insertValues [e]
+    insertEntry (SidekiqJobEntry e) =
+      runInsert $ Pg.insert (dbSidekiqJobs db)
+                ( insertValues [e] )
+                ( Pg.onConflict (Pg.conflictingFields sjJobId) Pg.onConflictSetAll )
 
 runScheduler :: Scheduler -> IO ()
 runScheduler scheduler =

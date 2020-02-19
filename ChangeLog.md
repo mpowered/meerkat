@@ -1,5 +1,13 @@
 # Changelog for meerkat
 
+## 0.3.0.0
+
+### Added
+- JSON file importer that supports ActionController and SidekiqJob formats
+
+### Removed
+- SidekiqJobs no longer fetched from Redis
+
 ## 0.2.4.1
 
 ### Fixed

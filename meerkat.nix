@@ -28,31 +28,31 @@ in {
   options.services.meerkat = {
     enable = mkEnableOption "meerkat service";
     host = mkOption {
-      type = types.string;
+      type = types.str;
       description = ''Host that identifies this system to report with metrics.'';
     };
     database = {
       host = mkOption {
-        type = types.string;
+        type = types.str;
         default = "localhost";
         description = ''Host where the Meerkat postgresql database can be found.'';
       };
       port = mkOption {
-        type = types.int;
+        type = types.port;
         default = 5432;
         description = ''Port where the Meerkat postgresql database can be found.'';
       };
       user = mkOption {
-        type = types.string;
+        type = types.str;
         default = "meerkat";
         description = ''User to use when authorizing with the Meerkat postgresql database.'';
       };
       password = mkOption {
-        type = types.string;
+        type = types.str;
         description = ''Password to use when authorizing with the Meerkat postgresql database.'';
       };
       database = mkOption {
-        type = types.string;
+        type = types.str;
         description = ''Database name of the Meerkat postgresql database.'';
       };
     };

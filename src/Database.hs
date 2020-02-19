@@ -9,19 +9,21 @@
 
 module Database where
 
+import           Data.Aeson               (Value)
 import           Data.Scientific
 import           Data.Text                as Text
 import           Data.Time.Clock
 import           Database.Beam
 
 data DB f = DB
-  { dbDiskSpaceUsage :: f (TableEntity DiskSpaceUsageT)
-  , dbMemoryUsage    :: f (TableEntity MemoryUsageT)
-  , dbProcessStats   :: f (TableEntity ProcessStatsT)
-  , dbSidekiqQueues  :: f (TableEntity SidekiqQueueT)
-  , dbSidekiqJobs    :: f (TableEntity SidekiqJobsT)
-  , dbPuma           :: f (TableEntity PumaT)
-  , dbHoneybadger    :: f (TableEntity HoneybadgerT)
+  { dbDiskSpaceUsage    :: f (TableEntity DiskSpaceUsageT)
+  , dbMemoryUsage       :: f (TableEntity MemoryUsageT)
+  , dbProcessStats      :: f (TableEntity ProcessStatsT)
+  , dbSidekiqQueues     :: f (TableEntity SidekiqQueueT)
+  , dbSidekiqJobs       :: f (TableEntity SidekiqJobT)
+  , dbPuma              :: f (TableEntity PumaT)
+  , dbHoneybadger       :: f (TableEntity HoneybadgerT)
+  , dbActionController  :: f (TableEntity ActionControllerT)
   } deriving Generic
 
 instance Database be DB
@@ -103,20 +105,22 @@ instance Table SidekiqQueueT where
 type SidekiqQueue = SidekiqQueueT Identity
 deriving instance Show SidekiqQueue
 
-data SidekiqJobsT f = SidekiqJobsT
-  { sjTime        :: C f UTCTime
+data SidekiqJobT f = SidekiqJobT
+  { sjJobId       :: C f Text
   , sjQueue       :: C f Text
   , sjClass       :: C f Text
-  , sjLength      :: C f Integer
-  , sjEnqueuedFor :: C f Double
+  , sjParams      :: C f Value
+  , sjEnqueuedAt  :: C f UTCTime
+  , sjStartedAt   :: C f (Maybe UTCTime)
+  , sjCompletedAt :: C f (Maybe UTCTime)
   } deriving (Generic, Beamable)
 
-instance Table SidekiqJobsT where
-  data PrimaryKey SidekiqJobsT f = SidekiqJobKey (C f UTCTime) (C f Text) deriving (Generic, Beamable)
-  primaryKey = SidekiqJobKey <$> sjTime <*> sjClass
+instance Table SidekiqJobT where
+  data PrimaryKey SidekiqJobT f = SidekiqJobKey (C f Text) deriving (Generic, Beamable)
+  primaryKey = SidekiqJobKey <$> sjJobId
 
-type SidekiqJobs = SidekiqJobsT Identity
-deriving instance Show SidekiqJobs
+type SidekiqJob = SidekiqJobT Identity
+deriving instance Show SidekiqJob
 
 data PumaT f = PumaT
   { pTime         :: C f UTCTime
@@ -147,3 +151,29 @@ instance Table HoneybadgerT where
 
 type Honeybadger = HoneybadgerT Identity
 deriving instance Show Honeybadger
+
+data ActionControllerT f = ActionControllerT
+  { acTime          :: C f UTCTime
+  , acHost          :: C f Text
+  , acApp           :: C f Text
+  , acUserId        :: C f (Maybe Text)
+  , acAccountId     :: C f (Maybe Text)
+  , acScorecardId   :: C f (Maybe Text)
+  , acController    :: C f Text
+  , acAction        :: C f Text
+  , acParams        :: C f (Maybe Value)
+  , acFormat        :: C f (Maybe Text)
+  , acMethod        :: C f Text
+  , acPath          :: C f Text
+  , acStatus        :: C f (Maybe Text)
+  , acViewRuntime   :: C f (Maybe Double)
+  , acDbRuntime     :: C f (Maybe Double)
+  , acTotalRuntime  :: C f (Maybe Double)
+  } deriving (Generic, Beamable)
+
+instance Table ActionControllerT where
+  data PrimaryKey ActionControllerT f = ActionControllerKey (C f UTCTime) (C f Text) (C f Text) deriving (Generic, Beamable)
+  primaryKey = ActionControllerKey <$> acTime <*> acHost <*> acApp
+
+type ActionController = ActionControllerT Identity
+deriving instance Show ActionController
