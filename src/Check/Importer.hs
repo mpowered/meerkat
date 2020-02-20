@@ -10,13 +10,10 @@ module Check.Importer
 where
 
 import           Control.Error
-import qualified Control.Logging          as Log
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Data.Aeson
-import qualified Data.ByteString.Char8    as C8
 import           Data.List                (sort)
-import qualified Data.Text                as Text
 import           Database
 import           System.Directory
 import           System.FilePath
@@ -63,24 +60,18 @@ instance FromJSON Entry where
           <*> e .:? "completed_at"
         )
 
-importFile :: FilePath -> IO [Entry]
+importFile :: FilePath -> ExceptT String IO [Entry]
 importFile path = do
-  c <- C8.readFile path
-  let es = map eitherDecodeStrict (C8.lines c)
-  removeFile path
-  let (errs, entries) = partitionEithers es
-  unless (null errs) $ do
-    Log.warn $ Text.pack (show $ length errs) <> " parse errors importing " <> Text.pack path
-    mapM_ (Log.debug . Text.pack) (take 5 errs)
-  Log.debug $ "Imported " <> Text.pack (show $ length entries) <> " entries from " <> Text.pack path
+  entries <- ExceptT $ eitherDecodeFileStrict' path
+  liftIO $ removeFile path
   return entries
 
 importEntries :: FilePath -> ExceptT String IO [Entry]
-importEntries path =
-  liftIO $ do
+importEntries path = do
+  sorted <- liftIO $ do
     dirEntries <- map (path </>) <$> listDirectory path
-    files <- filterM doesFileExist dirEntries
+    files <- filter ("json" `isExtensionOf`) <$> filterM doesFileExist dirEntries
     mtimes <- mapM getModificationTime files
     -- sort on (mtime, filename) so filename splits ties in mtime
-    let sorted = map snd $ sort $ zip mtimes files
-    concat <$> mapM importFile sorted
+    return $ map snd $ sort $ zip mtimes files
+  concat <$> mapM importFile sorted
