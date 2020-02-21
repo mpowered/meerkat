@@ -1,5 +1,10 @@
 # Changelog for meerkat
 
+## 0.3.0.1
+
+### Changed
+- SidekiqJob uses coalesce to update started_at and completed_at timestamps
+
 ## 0.3.0.0
 
 ### Added

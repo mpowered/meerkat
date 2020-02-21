@@ -460,7 +460,20 @@ importer msgq ImporterConfig{..} =
     insertEntry (SidekiqJobEntry e) =
       runInsert $ Pg.insert (dbSidekiqJobs db)
                 ( insertValues [e] )
-                ( Pg.onConflict (Pg.conflictingFields sjJobId) Pg.onConflictSetAll )
+                ( Pg.onConflict
+                  (Pg.conflictingFields sjJobId)
+                  (Pg.onConflictUpdateSet
+                    (\tbl tblExcl -> mconcat
+                      [ sjQueue tbl <-. sjQueue tblExcl
+                      , sjClass tbl <-. sjClass tblExcl
+                      , sjParams tbl <-. sjParams tblExcl
+                      , sjEnqueuedAt tbl <-. sjEnqueuedAt tblExcl
+                      , sjStartedAt tbl <-. coalesce_ [ just_ (sjStartedAt tblExcl), just_ (current_ (sjStartedAt tbl)) ] nothing_
+                      , sjCompletedAt tbl <-. coalesce_ [ just_ (sjCompletedAt tblExcl), just_ (current_ (sjCompletedAt tbl)) ] nothing_
+                      ]
+                    )
+                  )
+                )
 
 runScheduler :: Scheduler -> IO ()
 runScheduler scheduler =
