@@ -4,10 +4,10 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 6502f7c2a9969a49687c12d2aa1007f9962469d9706c09799ae2841f6284bdf1
+-- hash: f12cba901d0b26f69cd04b0bb9707767a0ec64c27cc21765ddcd734c62225224
 
 name:           meerkat
-version:        0.3.0.1
+version:        0.3.0.2
 description:    Please see the README on GitHub at <https://github.com/mpowered/meerkat#readme>
 homepage:       https://github.com/mpowered/meerkat#readme
 bug-reports:    https://github.com/mpowered/meerkat/issues
@@ -42,6 +42,7 @@ library
   ghc-options: -Wall -O2
   build-depends:
       aeson >=1.4 && <1.5
+    , aeson-extra >=0.4 && <0.5
     , async >=2.2 && <2.3
     , base >=4.7 && <5
     , beam-core >=0.8 && <0.9
@@ -56,6 +57,7 @@ library
     , megaparsec >=7.0 && <7.1
     , optparse-applicative >=0.14 && <0.15
     , pqueue >=1.4 && <1.5
+    , recursion-schemes >=5.1 && <5.2
     , req >=2.1 && <2.2
     , resource-pool >=0.2 && <0.3
     , scientific >=0.3 && <0.4
@@ -76,6 +78,7 @@ executable meerkat
   ghc-options: -Wall -O2 -threaded -rtsopts -with-rtsopts=-N -I0
   build-depends:
       aeson >=1.4 && <1.5
+    , aeson-extra >=0.4 && <0.5
     , async >=2.2 && <2.3
     , base >=4.7 && <5
     , beam-core >=0.8 && <0.9
@@ -91,6 +94,7 @@ executable meerkat
     , megaparsec >=7.0 && <7.1
     , optparse-applicative >=0.14 && <0.15
     , pqueue >=1.4 && <1.5
+    , recursion-schemes >=5.1 && <5.2
     , req >=2.1 && <2.2
     , resource-pool >=0.2 && <0.3
     , scientific >=0.3 && <0.4
@@ -112,6 +116,7 @@ test-suite spec
   ghc-options: -Wall -O2
   build-depends:
       aeson >=1.4 && <1.5
+    , aeson-extra >=0.4 && <0.5
     , async >=2.2 && <2.3
     , base >=4.7 && <5
     , beam-core >=0.8 && <0.9
@@ -127,6 +132,7 @@ test-suite spec
     , megaparsec >=7.0 && <7.1
     , optparse-applicative >=0.14 && <0.15
     , pqueue >=1.4 && <1.5
+    , recursion-schemes >=5.1 && <5.2
     , req >=2.1 && <2.2
     , resource-pool >=0.2 && <0.3
     , scientific >=0.3 && <0.4

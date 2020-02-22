@@ -13,7 +13,10 @@ import           Control.Error
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Data.Aeson
-import           Data.List                (sort)
+import           Data.Aeson.Extra.Recursive
+import           Data.Functor.Foldable
+import           Data.List                  (sort)
+import qualified Data.Text                  as T
 import           Database
 import           System.Directory
 import           System.FilePath
@@ -40,7 +43,7 @@ instance FromJSON Entry where
           <*> e .:? "scorecard_id"
           <*> e .:  "controller"
           <*> e .:  "action"
-          <*> e .:? "params"
+          <*> (fmap clean <$> (e .:? "params"))
           <*> e .:? "format"
           <*> e .:  "method"
           <*> e .:  "path"
@@ -54,11 +57,18 @@ instance FromJSON Entry where
           <$> e .:  "jid"
           <*> e .:  "queue"
           <*> e .:  "class"
-          <*> e .:  "params"
+          <*> (clean <$> (e .: "params"))
           <*> e .:  "enqueued_at"
           <*> e .:? "started_at"
           <*> e .:? "completed_at"
         )
+
+-- Clean a JSON value suitable for Postgresql's jsonb
+clean :: Value -> Value
+clean = cata (embed . f)
+ where
+   f (StringF a) = StringF $ T.filter (/= '\0000') a
+   f x = x
 
 importFile :: FilePath -> ExceptT String IO [Entry]
 importFile path = do

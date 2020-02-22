@@ -1,9 +1,14 @@
 # Changelog for meerkat
 
+## 0.3.0.2
+
+### Changed
+- Clean \0000 from ActionController/SidekiqJob params
+
 ## 0.3.0.1
 
 ### Changed
-- SidekiqJob uses coalesce to update started_at and completed_at timestamps
+- SidekiqJob uses coalesce to update started\_at and completed\_at timestamps
 
 ## 0.3.0.0
 
