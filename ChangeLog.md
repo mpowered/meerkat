@@ -1,6 +1,11 @@
 # Changelog for meerkat
 
-## 0.3.1.2
+## 0.3.1.1
+
+### Changed
+- Poll sidekiq_queues once every 60s instead of 20s
+
+## 0.3.1.0
 
 ### Changed
 - Include class and jobs ids in SidekiqQueues

@@ -304,7 +304,7 @@ app Config{..} = do
   where
     newSkJobs msgq cfg = do
       conn <- Redis.connect (cfgSkDatabase cfg)
-      newPeriodicJob "Check sidekiq queues" (sidekiq msgq conn cfg) 20
+      newPeriodicJob "Check sidekiq queues" (sidekiq msgq conn cfg) 60
 
 data LoggerResult
   = LoggerContinue
