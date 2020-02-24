@@ -1,5 +1,10 @@
 # Changelog for meerkat
 
+## 0.3.1.2
+
+### Changed
+- Include class and jobs ids in SidekiqQueues
+
 ## 0.3.0.2
 
 ### Changed

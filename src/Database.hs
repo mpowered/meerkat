@@ -13,6 +13,7 @@ import           Data.Aeson               (Value)
 import           Data.Scientific
 import           Data.Text                as Text
 import           Data.Time.Clock
+import           Data.Vector              (Vector)
 import           Database.Beam
 
 data DB f = DB
@@ -95,12 +96,15 @@ deriving instance Show MemoryUsage
 data SidekiqQueueT f = SidekiqQueueT
   { sqTime        :: C f UTCTime
   , sqQueue       :: C f Text
+  , sqClass       :: C f Text
   , sqLength      :: C f Integer
+  , sqEnqueuedFor :: C f Double
+  , sqJobIds      :: C f (Vector Text)
   } deriving (Generic, Beamable)
 
 instance Table SidekiqQueueT where
-  data PrimaryKey SidekiqQueueT f = SidekiqQueueKey (C f UTCTime) (C f Text) deriving (Generic, Beamable)
-  primaryKey = SidekiqQueueKey <$> sqTime <*> sqQueue
+  data PrimaryKey SidekiqQueueT f = SidekiqQueueKey (C f UTCTime) (C f Text) (C f Text) deriving (Generic, Beamable)
+  primaryKey = SidekiqQueueKey <$> sqTime <*> sqQueue <*> sqClass
 
 type SidekiqQueue = SidekiqQueueT Identity
 deriving instance Show SidekiqQueue

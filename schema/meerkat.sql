@@ -49,7 +49,10 @@ SELECT create_hypertable('process_stats', 'time');
 CREATE TABLE sidekiq_queues (
     "time" timestamp with time zone NOT NULL,
     "queue" text NOT NULL,
-    "length" bigint
+    class text NOT NULL,
+    "length" bigint NOT NULL,
+    enqueued_for double precision NOT NULL,
+    job_ids text []
 );
 
 SELECT create_hypertable('sidekiq_queues', 'time');
@@ -59,12 +62,12 @@ CREATE TABLE sidekiq_jobs (
     "queue" text NOT NULL,
     class text NOT NULL,
     params jsonb NOT NULL,
-    "enqueued_at" timestamp with time zone NOT NULL,
-    "started_at" timestamp with time zone,
-    "completed_at" timestamp with time zone
+    enqueued_at timestamp with time zone NOT NULL,
+    started_at timestamp with time zone,
+    completed_at timestamp with time zone
 );
 
-SELECT create_hypertable('sidekiq_jobs', 'enqueued_at');
+-- SELECT create_hypertable('sidekiq_jobs', 'enqueued_at');
 
 CREATE TABLE puma (
     "time" timestamp with time zone NOT NULL,

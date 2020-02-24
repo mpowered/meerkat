@@ -1,5 +1,5 @@
 name:                meerkat
-version:             0.3.0.2
+version:             0.3.1.0
 github:              "mpowered/meerkat"
 license:             BSD3
 author:              "Shaun Sharples"
@@ -37,6 +37,7 @@ dependencies:
 - time >= 1.8 && < 1.9
 - typed-process >= 0.2 && < 0.3
 - unordered-containers >= 0.2 && < 0.3
+- vector >= 0.12 && < 0.13
 - yaml >= 0.11 && < 0.12
 
 ghc-options:
