@@ -440,6 +440,12 @@ honeybadger msgq HoneybadgerConfig{..} = do
     insertAction :: [Honeybadger] -> m ()
     insertAction = runInsert . insert (dbHoneybadger db) . insertValues
 
+groupEntries :: [Entry] -> ([ActionController], [SidekiqJob])
+groupEntries entries = mconcat (map byGroup entries)
+  where
+    byGroup (ActionControllerEntry x) = ([x], [])
+    byGroup (SidekiqJobEntry x)  = ([], [x])
+
 importer
   :: MessageQueue Pg.Pg
   -> ImporterConfig
@@ -451,15 +457,20 @@ importer msgq ImporterConfig{..} =
     (importEntries cfgIPath)
   where
     insertAction :: [Entry] -> Pg.Pg ()
-    insertAction = mapM_ insertEntry
+    insertAction entries = do
+      let (ac, sj) = groupEntries entries
+      unless (null ac) $ insertActionControllerEntries ac
+      unless (null sj) $ insertSidekiqJobEntries sj
 
-    insertEntry :: Entry -> Pg.Pg ()
-    insertEntry (ActionControllerEntry e) =
+    insertActionControllerEntries :: [ActionController] -> Pg.Pg ()
+    insertActionControllerEntries es =
       runInsert $ insert (dbActionController db)
-                $ insertValues [e]
-    insertEntry (SidekiqJobEntry e) =
+                $ insertValues es
+
+    insertSidekiqJobEntries :: [SidekiqJob] -> Pg.Pg ()
+    insertSidekiqJobEntries es =
       runInsert $ Pg.insert (dbSidekiqJobs db)
-                ( insertValues [e] )
+                ( insertValues es )
                 ( Pg.onConflict
                   (Pg.conflictingFields sjJobId)
                   (Pg.onConflictUpdateSet

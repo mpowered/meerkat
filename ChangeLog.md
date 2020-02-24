@@ -1,5 +1,10 @@
 # Changelog for meerkat
 
+## 0.3.1.2
+
+### Changed
+- Group import entries by time for batched insert
+
 ## 0.3.1.1
 
 ### Changed
