@@ -1,5 +1,13 @@
 # Changelog for meerkat
 
+## 0.3.1.3
+
+### Changed
+- Coalesce jobs pre-insert
+
+  postgresql returns "ON CONFLICT DO UPDATE command cannot affect row a second time" if non-unique job_ids attempt to
+  update a row
+
 ## 0.3.1.2
 
 ### Changed

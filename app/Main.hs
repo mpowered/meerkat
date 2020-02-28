@@ -12,6 +12,7 @@
 
 module Main where
 
+import           Control.Applicative
 import           Control.Concurrent
 import           Control.Concurrent.Async
 import           Control.Concurrent.STM
@@ -22,7 +23,7 @@ import           Control.Monad
 import           Data.ByteString              (ByteString)
 import           Data.Pool
 import qualified Data.PQueue.Prio.Min         as PQueue
-import qualified Database.Redis               as Redis
+import qualified Data.HashMap.Strict          as HM
 import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
 import qualified Data.Text.Encoding           as Text
@@ -35,6 +36,7 @@ import           Database.Beam.Backend.SQL
 import           Database.Beam.Schema.Tables
 import qualified Database.Beam.Postgres       as Pg
 import qualified Database.Beam.Postgres.Full  as Pg
+import qualified Database.Redis               as Redis
 import           Network.HostName             (getHostName)
 import qualified Network.HTTP.Req             as Req
 import qualified Options.Applicative          as OptParse
@@ -441,10 +443,22 @@ honeybadger msgq HoneybadgerConfig{..} = do
     insertAction = runInsert . insert (dbHoneybadger db) . insertValues
 
 groupEntries :: [Entry] -> ([ActionController], [SidekiqJob])
-groupEntries entries = mconcat (map byGroup entries)
+groupEntries entries =
+  let (acs, sjs) = go entries in (acs, dedup sjs)
   where
+    go es = mconcat (map byGroup es)
     byGroup (ActionControllerEntry x) = ([x], [])
-    byGroup (SidekiqJobEntry x)  = ([], [x])
+    byGroup (SidekiqJobEntry x)       = ([], [x])
+    dedup = HM.elems . HM.fromListWith sjcoalesce . map (\sj -> (sjJobId sj, sj))
+    sjcoalesce a b =
+      SidekiqJobT { sjJobId        = sjJobId b
+                  , sjQueue        = sjQueue b
+                  , sjClass        = sjClass b
+                  , sjParams       = sjParams b
+                  , sjEnqueuedAt   = sjEnqueuedAt b
+                  , sjStartedAt    = sjStartedAt b <|> sjStartedAt a
+                  , sjCompletedAt  = sjCompletedAt b <|> sjCompletedAt a
+                  }
 
 importer
   :: MessageQueue Pg.Pg
