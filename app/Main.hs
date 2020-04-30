@@ -46,6 +46,7 @@ import           Check.DiskSpaceUsage
 import           Check.Honeybadger
 import           Check.Importer
 import           Check.MemoryUsage
+import           Check.Mysql
 import           Check.Puma
 import           Check.ProcessStatistics
 import           Check.SidekiqQueues
@@ -67,10 +68,11 @@ data BinConfig = BinConfig
   { cfgDF           :: FilePath
   , cfgFree         :: FilePath
   , cfgPidstat      :: FilePath
+  , cfgMysql        :: Maybe FilePath
   }
 
 defaultBinConfig :: BinConfig
-defaultBinConfig = BinConfig "df" "free" "pidstat"
+defaultBinConfig = BinConfig "df" "free" "pidstat" Nothing
 
 data LogConfig = LogConfig
   { cfgLogFile      :: Maybe FilePath
@@ -123,6 +125,7 @@ instance FromJSON BinConfig where
       <$> o .:? "df"       .!= cfgDF defaultBinConfig
       <*> o .:? "free"     .!= cfgFree defaultBinConfig
       <*> o .:? "pidstat"  .!= cfgPidstat defaultBinConfig
+      <*> o .:? "mysql"
 
 instance FromJSON SidekiqConfig where
   parseJSON = withObject "SidekiqConfig" $ \o ->
@@ -279,6 +282,7 @@ app Config{..} = do
   i   <- traverse (\cfg -> newPeriodicJob "Importer" (importer msgq cfg) 60) cfgImporter
   pidstat1 <- newPeriodicJob "Check process statistics" (pidstats msgq (cfgPidstat cfgBinaries) hostname) 120
   pidstat2 <- newPeriodicJob "Check process statistics" (pidstats msgq (cfgPidstat cfgBinaries) hostname) 120
+  my  <- traverse (\bin -> newPeriodicJob "MySql processlist" (mysql msgq bin hostname) 60) (cfgMysql cfgBinaries)
   sk  <- traverse (\cfg -> newSkJobs msgq cfg) cfgSidekiq
   let queue = PQueue.fromList $ catMaybes
                 [ Just (now, df)
@@ -287,6 +291,7 @@ app Config{..} = do
                 , (now, ) <$> p
                 , (now, ) <$> hb
                 , (now, ) <$> i
+                , (now, ) <$> my
                 -- run two instances of pidstat, each triggered every 2 mins
                 -- each one is expected to collect stats for 1 minute
                 , Just (now, pidstat1)
@@ -441,6 +446,22 @@ honeybadger msgq HoneybadgerConfig{..} = do
   where
     insertAction :: [Honeybadger] -> m ()
     insertAction = runInsert . insert (dbHoneybadger db) . insertValues
+
+mysql
+  :: forall be m. ( BeamSqlBackend be , MonadBeam be m , FieldsFulfillConstraint (BeamSqlBackendCanSerialize be) MysqlProcessListT )
+  => MessageQueue m
+  -> FilePath
+  -> Text
+  -> IO ()
+mysql msgq bin hostname = do
+  now <- getCurrentTime
+  exceptT
+    print
+    (atomically . sendMessage msgq . SampleData . insertAction)
+    (mysqlProcessList bin hostname now)
+  where
+    insertAction :: [MysqlProcessList] -> m ()
+    insertAction = runInsert . insert (dbMysqlProcesslist db) . insertValues
 
 groupEntries :: [Entry] -> ([ActionController], [SidekiqJob])
 groupEntries entries =

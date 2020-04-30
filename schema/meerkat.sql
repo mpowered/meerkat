@@ -109,3 +109,18 @@ CREATE TABLE action_controller (
 );
 
 SELECT create_hypertable('action_controller', 'time');
+
+CREATE TABLE "mysql_processlist" (
+    "time" timestamp with time zone NOT NULL,
+    "server" text NOT NULL,
+    id integer NOT NULL,
+    "user" text,
+    host text,
+    command text,
+    ptime integer,
+    "state" text,
+    info text,
+    progress double precision
+);
+
+SELECT create_hypertable('mysql_processlist', 'time');

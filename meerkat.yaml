@@ -1,6 +1,6 @@
 hostname: neptune
 logging:
-  logfile: meerkat.log
+  # logfile: meerkat.log
   loglevel: debug
 database:
   host: localhost
@@ -11,11 +11,12 @@ binaries:
   df: df
   free: free
   pidstat: pidstat
+  mysql: mysql
+importer:
+  path: import
 sidekiq:
   database: redis://localhost/0
   queues: production
-importer:
-  path: import
 puma:
   url: http://localhost:9292/stats
   token: secret

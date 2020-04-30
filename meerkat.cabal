@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: bdf6f13d023ec9af6974652636a44bad5fcadf0e9291950187ba73273eb30eaf
+-- hash: 4e5b5ba70ff41cc074ce0139a74956625a49a8202ee8d792de203bf4472c6d6d
 
 name:           meerkat
 version:        0.3.1.3
@@ -31,6 +31,7 @@ library
       Check.Honeybadger
       Check.Importer
       Check.MemoryUsage
+      Check.Mysql
       Check.ProcessStatistics
       Check.Puma
       Check.SidekiqQueues
@@ -67,6 +68,7 @@ library
     , typed-process >=0.2 && <0.3
     , unordered-containers >=0.2 && <0.3
     , vector >=0.12 && <0.13
+    , xeno >=0.3 && <0.4
     , yaml >=0.11 && <0.12
   default-language: Haskell2010
 
@@ -105,6 +107,7 @@ executable meerkat
     , typed-process >=0.2 && <0.3
     , unordered-containers >=0.2 && <0.3
     , vector >=0.12 && <0.13
+    , xeno >=0.3 && <0.4
     , yaml >=0.11 && <0.12
   default-language: Haskell2010
 
@@ -144,5 +147,6 @@ test-suite spec
     , typed-process >=0.2 && <0.3
     , unordered-containers >=0.2 && <0.3
     , vector >=0.12 && <0.13
+    , xeno >=0.3 && <0.4
     , yaml >=0.11 && <0.12
   default-language: Haskell2010

@@ -25,6 +25,7 @@ data DB f = DB
   , dbPuma              :: f (TableEntity PumaT)
   , dbHoneybadger       :: f (TableEntity HoneybadgerT)
   , dbActionController  :: f (TableEntity ActionControllerT)
+  , dbMysqlProcesslist  :: f (TableEntity MysqlProcessListT)
   } deriving Generic
 
 instance Database be DB
@@ -181,3 +182,23 @@ instance Table ActionControllerT where
 
 type ActionController = ActionControllerT Identity
 deriving instance Show ActionController
+
+data MysqlProcessListT f = MysqlProcessListT
+  { mplTime          :: C f UTCTime
+  , mplServer        :: C f Text
+  , mplId            :: C f Integer
+  , mplUser          :: C f (Maybe Text)
+  , mplHost          :: C f (Maybe Text)
+  , mplCommand       :: C f (Maybe Text)
+  , mplPtime         :: C f (Maybe Integer)
+  , mplState         :: C f (Maybe Text)
+  , mplInfo          :: C f (Maybe Text)
+  , mplProgress      :: C f (Maybe Double)
+  } deriving (Generic, Beamable)
+
+instance Table MysqlProcessListT where
+  data PrimaryKey MysqlProcessListT f = MysqlProcessListKey (C f UTCTime) (C f Text) (C f Integer) deriving (Generic, Beamable)
+  primaryKey = MysqlProcessListKey <$> mplTime <*> mplServer <*> mplId
+
+type MysqlProcessList = MysqlProcessListT Identity
+deriving instance Show MysqlProcessList
