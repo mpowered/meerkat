@@ -51,6 +51,7 @@ instance FromJSON Entry where
           <*> e .:? "view_runtime"
           <*> e .:? "db_runtime"
           <*> e .:? "total_runtime"
+          <*> e .:? "headers"
         )
       sidekiqJob e = SidekiqJobEntry <$>
         ( SidekiqJobT

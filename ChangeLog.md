@@ -1,5 +1,11 @@
 # Changelog for meerkat
 
+## 0.3.3.0
+
+### Added
+
+- HTTP request headers
+
 ## 0.3.2.0
 
 ### Added

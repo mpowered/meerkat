@@ -174,6 +174,7 @@ data ActionControllerT f = ActionControllerT
   , acViewRuntime   :: C f (Maybe Double)
   , acDbRuntime     :: C f (Maybe Double)
   , acTotalRuntime  :: C f (Maybe Double)
+  , acHeaders       :: C f (Maybe Value)
   } deriving (Generic, Beamable)
 
 instance Table ActionControllerT where
