@@ -70,7 +70,7 @@ runRedis conn r = withExceptT redisResult $ ExceptT $ Redis.runRedis conn r
     redisResult _                 = "Redis returned unexpected result"
 
 sidekiqQueues :: Text -> Redis.Connection -> UTCTime -> ExceptT String IO [SidekiqQueue]
-sidekiqQueues env conn timestamp = do
+sidekiqQueues _env conn timestamp = do
   names <- runRedis conn $ Redis.smembers queues
   let qnames = map queue names
   jobs <- runRedis conn $ sequence <$> mapM (\q -> Redis.lrange q 0 (-1)) qnames
@@ -80,8 +80,8 @@ sidekiqQueues env conn timestamp = do
                 , j <- js ]
   return $ map (uncurry mkSidekiqJob) (HM.toList stats)
   where
-    queues = Text.encodeUtf8 $ env <> ":queues"
-    queue n = Text.encodeUtf8 env <> ":queue:" <> n
+    queues = "queues"
+    queue n = "queue:" <> n
 
     mkSidekiqJob (q,cls) stat =
       SidekiqQueueT

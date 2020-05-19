@@ -1,5 +1,11 @@
 # Changelog for meerkat
 
+## 0.3.3.1
+
+### Changed
+
+- No longer using Sidekiq namespaces changed the queue names
+
 ## 0.3.3.0
 
 ### Added
