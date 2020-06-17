@@ -69,17 +69,19 @@ runRedis conn r = withExceptT redisResult $ ExceptT $ Redis.runRedis conn r
     redisResult (Redis.Error msg) = "Redis error: " ++ show msg
     redisResult _                 = "Redis returned unexpected result"
 
-sidekiqQueues :: Text -> Redis.Connection -> UTCTime -> ExceptT String IO [SidekiqQueue]
-sidekiqQueues _env conn timestamp = do
-  names <- runRedis conn $ Redis.smembers queues
-  let qnames = map queue names
-  jobs <- runRedis conn $ sequence <$> mapM (\q -> Redis.lrange q 0 (-1)) qnames
-  let JobsStats stats =
-        mconcat [ maybe mempty (jobStats timestamp q) (Aeson.decodeStrict' j)
-                | (q, js) <- zip (Text.decodeUtf8 <$> qnames) jobs
-                , j <- js ]
-  return $ map (uncurry mkSidekiqJob) (HM.toList stats)
+sidekiqQueues ::  [Redis.ConnectInfo] -> UTCTime -> ExceptT String IO [SidekiqQueue]
+sidekiqQueues databases timestamp = concat <$> mapM go databases
   where
+    go conninfo = liftIO Redis.withConnect $ \conn -> do
+      names <- runRedis conn $ Redis.smembers queues
+      let qnames = map queue names
+      jobs <- runRedis conn $ sequence <$> mapM (\q -> Redis.lrange q 0 (-1)) qnames
+      let JobsStats stats =
+            mconcat [ maybe mempty (jobStats timestamp q) (Aeson.decodeStrict' j)
+                    | (q, js) <- zip (Text.decodeUtf8 <$> qnames) jobs
+                    , j <- js ]
+      return $ map (uncurry mkSidekiqJob) (HM.toList stats)
+
     queues = "queues"
     queue n = "queue:" <> n
 

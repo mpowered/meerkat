@@ -15,8 +15,11 @@ binaries:
 importer:
   path: import
 sidekiq:
-  database: redis://localhost/0
-  queues: production
+  databases:
+  - redis://localhost/3
+  - redis://localhost/4
+  - redis://localhost/5
+  - redis://localhost/6
 puma:
   url: http://localhost:9292/stats
   token: secret

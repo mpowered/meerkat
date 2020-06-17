@@ -83,8 +83,7 @@ defaultLogConfig :: LogConfig
 defaultLogConfig = LogConfig Nothing Log.LevelInfo
 
 data SidekiqConfig = SidekiqConfig
-  { cfgSkDatabase   :: Redis.ConnectInfo
-  , cfgSkQueues     :: Text
+  { cfgSkDatabases  :: [Redis.ConnectInfo]
   }
 
 data PumaConfig = PumaConfig
@@ -130,8 +129,7 @@ instance FromJSON BinConfig where
 instance FromJSON SidekiqConfig where
   parseJSON = withObject "SidekiqConfig" $ \o ->
     SidekiqConfig
-      <$> o .:  "database"
-      <*> o .:  "queues"
+      <$> o .:  "databases"
 
 instance FromJSON PumaConfig where
   parseJSON = withObject "PumaConfig" $ \o -> do
@@ -283,7 +281,7 @@ app Config{..} = do
   pidstat1 <- newPeriodicJob "Check process statistics" (pidstats msgq (cfgPidstat cfgBinaries) hostname) 120
   pidstat2 <- newPeriodicJob "Check process statistics" (pidstats msgq (cfgPidstat cfgBinaries) hostname) 120
   my  <- traverse (\bin -> newPeriodicJob "MySql processlist" (mysql msgq bin hostname) 60) (cfgMysql cfgBinaries)
-  sk  <- traverse (\cfg -> newSkJobs msgq cfg) cfgSidekiq
+  sk  <- traverse (\cfg -> newPeriodicJob "Check sidekiq queues" (sidekiq msgq cfg) 60) cfgSidekiq
   let queue = PQueue.fromList $ catMaybes
                 [ Just (now, df)
                 , Just (now, mem)
@@ -307,11 +305,6 @@ app Config{..} = do
   atomically $ writeTVar shutdown True
   Log.log "Waiting for database logger to complete"
   void $ wait logger
-
-  where
-    newSkJobs msgq cfg = do
-      conn <- Redis.connect (cfgSkDatabase cfg)
-      newPeriodicJob "Check sidekiq queues" (sidekiq msgq conn cfg) 60
 
 data LoggerResult
   = LoggerContinue
@@ -388,15 +381,14 @@ memory msgq bin hostname = do
 sidekiq
   :: forall be m. ( BeamSqlBackend be , MonadBeam be m , FieldsFulfillConstraint (BeamSqlBackendCanSerialize be) SidekiqQueueT )
   => MessageQueue m
-  -> Redis.Connection
   -> SidekiqConfig
   -> IO ()
-sidekiq msgq conn SidekiqConfig{..} = do
+sidekiq msgq SidekiqConfig{..} = do
   now <- getCurrentTime
   exceptT
     print
     (atomically . sendMessage msgq . SampleData . insertAction)
-    (sidekiqQueues cfgSkQueues conn now)
+    (sidekiqQueues cfgSkDatabases now)
   where
     insertAction :: [SidekiqQueue] -> m ()
     insertAction = runInsert . insert (dbSidekiqQueues db) . insertValues
