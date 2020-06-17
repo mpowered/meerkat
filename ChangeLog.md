@@ -1,5 +1,11 @@
 # Changelog for meerkat
 
+## 0.3.4.0
+
+### Changed
+
+- Sidekiq now takes a list of redis databases
+
 ## 0.3.3.1
 
 ### Changed
