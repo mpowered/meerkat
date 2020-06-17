@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 26fbf8c2073d3d938890496cd7567b9daf92bc6bc285575375d5a213c0297647
+-- hash: a6edb1892bac2fbd5311efa95b2237ee329efaa240c257df346ba19943d642a2
 
 name:           meerkat
 version:        0.3.3.1
@@ -51,6 +51,7 @@ library
     , bytestring >=0.10 && <0.11
     , directory >=1.3 && <1.4
     , errors >=2.3 && <2.4
+    , exceptions >=0.10 && <0.11
     , filepath >=1.4 && <1.5
     , hedis >=0.12 && <0.13
     , hostname >=1.0 && <1.1
@@ -89,6 +90,7 @@ executable meerkat
     , bytestring >=0.10 && <0.11
     , directory >=1.3 && <1.4
     , errors >=2.3 && <2.4
+    , exceptions >=0.10 && <0.11
     , filepath >=1.4 && <1.5
     , hedis >=0.12 && <0.13
     , hostname >=1.0 && <1.1
@@ -129,6 +131,7 @@ test-suite spec
     , bytestring >=0.10 && <0.11
     , directory >=1.3 && <1.4
     , errors >=2.3 && <2.4
+    , exceptions >=0.10 && <0.11
     , filepath >=1.4 && <1.5
     , hedis >=0.12 && <0.13
     , hostname >=1.0 && <1.1

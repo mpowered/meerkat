@@ -11,6 +11,8 @@ module Check.SidekiqQueues
 where
 
 import           Control.Error
+import           Control.Monad.IO.Class     (liftIO)
+import qualified Control.Monad.Catch        as Catch
 import           Data.Aeson                 as Aeson
 import qualified Data.HashMap.Strict        as HM
 import           Data.Text                  (Text)
@@ -72,7 +74,9 @@ runRedis conn r = withExceptT redisResult $ ExceptT $ Redis.runRedis conn r
 sidekiqQueues ::  [Redis.ConnectInfo] -> UTCTime -> ExceptT String IO [SidekiqQueue]
 sidekiqQueues databases timestamp = concat <$> mapM go databases
   where
-    go conninfo = liftIO Redis.withConnect $ \conn -> do
+    -- in newer hedis
+    withConnect conninfo = Catch.bracket (liftIO $ Redis.connect conninfo) (liftIO . Redis.disconnect)
+    go conninfo = withConnect conninfo $ \conn -> do
       names <- runRedis conn $ Redis.smembers queues
       let qnames = map queue names
       jobs <- runRedis conn $ sequence <$> mapM (\q -> Redis.lrange q 0 (-1)) qnames
