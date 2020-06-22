@@ -1,5 +1,11 @@
 # Changelog for meerkat
 
+## 0.4.0.0
+
+### Changed
+
+- Switched to using haskell.nix
+
 ## 0.3.4.0
 
 ### Changed
