@@ -14,17 +14,17 @@ where
 
 import           Control.Error
 import qualified Data.Text                  as Text
-import qualified Data.Text.Encoding         as Text
 import           Data.Time.Clock            (UTCTime)
 import           Data.Yaml
 import           Database
 import           Network.HTTP.Req
+import           Text.URI                   (mkURI)
 
 data PumaCtl = forall scheme. PumaCtl (Url scheme) (Option scheme)
 
 instance FromJSON PumaCtl where
   parseJSON = withText "PumaCtlUrl" $ \s ->
-    case parseUrl (Text.encodeUtf8 s) of
+    case mkURI s >>= useURI of
       Nothing -> fail $ "'" <> Text.unpack s <> "' is not a valid url"
       Just (Left  (url, option)) -> return $ PumaCtl url option
       Just (Right (url, option)) -> return $ PumaCtl url option

@@ -1,21 +1,13 @@
-{ compiler ? "ghc865" }:
-
 let
   sources = import ./nix/sources.nix;
-  pkgs = import sources.nixpkgs {};
-
-  haskellPackages = pkgs.haskell.packages."${compiler}";
-
-  drv = haskellPackages.callCabal2nix "meerkat" ./. {
-    beam-core = with pkgs.haskell.lib; unmarkBroken (dontCheck haskellPackages.beam-core);
-    beam-postgres = with pkgs.haskell.lib; unmarkBroken (dontCheck haskellPackages.beam-postgres);
-    hedis = with pkgs.haskell.lib; dontCheck (haskellPackages.callCabal2nix "hedis" sources.hedis {});
-  };
-
+  haskellNix = import sources.haskell-nix {};
+  nixpkgsSrc = haskellNix.sources.nixpkgs-2003;
+  nixpkgsArgs = haskellNix.nixpkgsArgs;
+  pkgs = import nixpkgsSrc nixpkgsArgs;
 in
-{
-  meerkat = pkgs.haskell.lib.justStaticExecutables drv;
-  meerkat-shell = haskellPackages.shellFor {
-    packages = p: [drv];
-  };
-}
+  pkgs.haskell-nix.project {
+    src = pkgs.haskell-nix.haskellLib.cleanGit {
+      name = "meerkat";
+      src = ./.;
+    };
+  }
