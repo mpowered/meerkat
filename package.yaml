@@ -1,5 +1,5 @@
 name:                meerkat
-version:             0.4.0.0
+version:             0.4.0.1
 github:              "mpowered/meerkat"
 license:             BSD3
 author:              "Shaun Sharples"
@@ -49,15 +49,16 @@ ghc-options:
 library:
   source-dirs: src
 
-executable:
-  main:                Main.hs
-  source-dirs:         app
-  ghc-options:
-  - -threaded
-  - -rtsopts
-  - "-with-rtsopts=-N -I0"
-  dependencies:
-  - meerkat
+executables:
+  meerkat:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - "-with-rtsopts=-N -I0"
+    dependencies:
+    - meerkat
 
 tests:
   spec:
