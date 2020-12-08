@@ -39,9 +39,9 @@ instance Monoid JobsStats where
   mempty = JobsStats HM.empty
 
 data ClassStats = ClassStats
-  { classNumJobs :: Integer,
-    classTotalAge :: NominalDiffTime,
-    classJobs :: [Text]
+  { classNumJobs :: !Integer,
+    classTotalAge :: !NominalDiffTime,
+    classJobs :: ![Text]
   }
 
 instance Semigroup ClassStats where
@@ -55,9 +55,9 @@ instance Monoid ClassStats where
   mempty = ClassStats 0 0 []
 
 data Job = Job
-  { jobClass :: Text,
-    jobId :: Text,
-    jobEnqueuedAt :: UTCTime
+  { jobClass :: !Text,
+    jobId :: !Text,
+    jobEnqueuedAt :: !UTCTime
   }
 
 instance FromJSON Job where

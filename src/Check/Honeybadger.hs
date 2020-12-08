@@ -32,7 +32,7 @@ import Network.HTTP.Req
   )
 
 data Faults = Faults
-  { faultsTotal :: Integer
+  { faultsTotal :: !Integer
   }
 
 instance FromJSON Faults where

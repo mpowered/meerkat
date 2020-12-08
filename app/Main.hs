@@ -317,15 +317,13 @@ newStreamingJob desc action = do
         jobResult = result
       }
 
-type JobSpec = (UTCTime, Job)
-
 type JobQueue = PQueue.MinPQueue UTCTime Job
 
 data Running = Running (Async ()) (MVar Bool)
 
 data Scheduler = Scheduler
-  { queue :: JobQueue,
-    running :: [Running]
+  { queue :: !JobQueue,
+    running :: ![Running]
   }
 
 data Message m where

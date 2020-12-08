@@ -1,5 +1,17 @@
 # Changelog for meerkat
 
+## 0.5.0.1
+
+### Changed
+
+- Added a little bit of strictness
+
+## 0.5.0.0
+
+### Changed
+
+- Switched back to nixpkgs, use ghc 8.10.2
+
 ## 0.4.0.0
 
 ### Changed

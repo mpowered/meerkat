@@ -130,7 +130,7 @@ parser host timestamp = go []
         Header h -> go h
         Stats ps -> do
           ps' <- go headers
-          return (ps : ps')
+          return $! ps : ps'
         Preamble -> go headers
 
 pidstat :: FilePath -> ProcessConfig () () ()
