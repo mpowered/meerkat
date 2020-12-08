@@ -1,28 +1,32 @@
-{-# LANGUAGE FlexibleContexts   #-}
-{-# LANGUAGE FlexibleInstances  #-}
-{-# LANGUAGE OverloadedStrings  #-}
-{-# LANGUAGE TypeFamilies       #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Check.MemoryUsage
-  ( MemoryUsage
-  , MemoryUsageT (..)
-  , memoryUsage
+  ( MemoryUsage,
+    MemoryUsageT (..),
+    memoryUsage,
   )
 where
 
-import           Control.Applicative
-import           Control.Error
-import           Control.Monad
-import           Control.Monad.IO.Class     (liftIO)
-import qualified Data.Text                  as Text
-import qualified Data.Text.Lazy             as LText
-import qualified Data.Text.Lazy.Encoding    as Text
-import           Data.Time.Clock            (UTCTime)
-import           Data.Void                  (Void)
-import           Database
-import           System.Process.Typed       as Proc
-import qualified Text.Megaparsec            as M
-import qualified Text.Megaparsec.Char       as C
+import Control.Applicative (Alternative (empty))
+import Control.Error (ExceptT, throwE)
+import Control.Monad (void)
+import Control.Monad.IO.Class (liftIO)
+import qualified Data.Text as Text
+import qualified Data.Text.Lazy as LText
+import qualified Data.Text.Lazy.Encoding as Text
+import Data.Time.Clock (UTCTime)
+import Data.Void (Void)
+import Database (MemoryUsage, MemoryUsageT (..))
+import System.Process.Typed as Proc
+  ( ProcessConfig,
+    proc,
+    readProcess_,
+  )
+import qualified Text.Megaparsec as M
+import qualified Text.Megaparsec.Char as C
 import qualified Text.Megaparsec.Char.Lexer as L
 
 {-
@@ -61,7 +65,7 @@ vals host timestamp =
   MemoryUsageT
     <$> pure timestamp
     <*> pure host
-    <*  symbol "Mem:"
+    <* symbol "Mem:"
     <*> int
     <*> int
     <*> int
@@ -69,7 +73,7 @@ vals host timestamp =
     <*> int
     <*> int
     <*> int
-    <*  symbol "Swap:"
+    <* symbol "Swap:"
     <*> int
     <*> int
     <*> int

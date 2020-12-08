@@ -1,111 +1,209 @@
-{-# OPTIONS_GHC -Wno-orphans       #-}
-{-# LANGUAGE DataKinds             #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE NumDecimals           #-}
-{-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE RecordWildCards       #-}
-{-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE TupleSections         #-}
+{-# LANGUAGE NumDecimals #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 module Main where
 
-import           Control.Applicative
-import           Control.Concurrent
-import           Control.Concurrent.Async
-import           Control.Concurrent.STM
-import           Control.Error
-import           Control.Exception
-import qualified Control.Logging              as Log
-import           Control.Monad
-import           Data.ByteString              (ByteString)
-import           Data.Pool
-import qualified Data.PQueue.Prio.Min         as PQueue
-import qualified Data.HashMap.Strict          as HM
-import           Data.Text                    (Text)
-import qualified Data.Text                    as Text
-import qualified Data.Text.Encoding           as Text
-import           Data.Time.Clock
-import           Data.Version
-import           Data.Yaml
-import           Database
-import           Database.Beam
-import           Database.Beam.Backend.SQL
-import           Database.Beam.Schema.Tables
-import qualified Database.Beam.Postgres       as Pg
-import qualified Database.Beam.Postgres.Full  as Pg
-import qualified Database.Redis               as Redis
-import           Network.HostName             (getHostName)
-import qualified Network.HTTP.Req             as Req
-import qualified Options.Applicative          as OptParse
-import           Options.Applicative          ((<**>))
-
-import           Check.DiskSpaceUsage
-import           Check.Honeybadger
-import           Check.Importer
-import           Check.MemoryUsage
-import           Check.Mysql
-import           Check.Puma
-import           Check.ProcessStatistics
-import           Check.SidekiqQueues
-
-import           Paths_meerkat
+import Check.DiskSpaceUsage
+  ( DiskSpaceUsage,
+    DiskSpaceUsageT,
+    freespace,
+  )
+import Check.Honeybadger
+  ( Honeybadger,
+    HoneybadgerT,
+    honeybadgerFaults,
+  )
+import Check.Importer (Entry (..), importEntries)
+import Check.MemoryUsage (MemoryUsage, MemoryUsageT, memoryUsage)
+import Check.Mysql
+  ( MysqlProcessList,
+    MysqlProcessListT,
+    mysqlProcessList,
+  )
+import Check.ProcessStatistics
+  ( ProcessStats,
+    ProcessStatsT,
+    processes,
+  )
+import Check.Puma (Puma, PumaCtl (..), PumaT, pumaStats)
+import Check.SidekiqQueues
+  ( SidekiqQueue,
+    SidekiqQueueT,
+    sidekiqQueues,
+  )
+import Control.Applicative (Alternative ((<|>)), (<**>))
+import Control.Concurrent
+  ( MVar,
+    newMVar,
+    putMVar,
+    threadDelay,
+    tryTakeMVar,
+  )
+import Control.Concurrent.Async (Async, async, poll, wait)
+import Control.Concurrent.STM
+  ( STM,
+    TBQueue,
+    TVar,
+    atomically,
+    check,
+    newTBQueue,
+    newTVarIO,
+    orElse,
+    readTBQueue,
+    readTVar,
+    readTVarIO,
+    writeTBQueue,
+    writeTVar,
+  )
+import Control.Error (catMaybes, exceptT)
+import Control.Exception
+  ( AsyncException (UserInterrupt),
+    SomeException,
+    catchJust,
+    try,
+  )
+import qualified Control.Logging as Log
+import Control.Monad (unless, void)
+import Data.ByteString (ByteString)
+import qualified Data.HashMap.Strict as HM
+import qualified Data.PQueue.Prio.Min as PQueue
+import Data.Pool (Pool, createPool, withResource)
+import Data.Text (Text)
+import qualified Data.Text as Text
+import qualified Data.Text.Encoding as Text
+import Data.Time.Clock
+  ( NominalDiffTime,
+    UTCTime,
+    addUTCTime,
+    diffUTCTime,
+    getCurrentTime,
+  )
+import Data.Version (showVersion)
+import Data.Yaml
+  ( FromJSON (parseJSON),
+    decodeFileEither,
+    prettyPrintParseException,
+    withObject,
+    withText,
+    (.!=),
+    (.:),
+    (.:?),
+  )
+import Database
+  ( ActionController,
+    DB
+      ( dbActionController,
+        dbDiskSpaceUsage,
+        dbHoneybadger,
+        dbMemoryUsage,
+        dbMysqlProcesslist,
+        dbProcessStats,
+        dbPuma,
+        dbSidekiqJobs,
+        dbSidekiqQueues
+      ),
+    SidekiqJob,
+    SidekiqJobT
+      ( SidekiqJobT,
+        sjClass,
+        sjCompletedAt,
+        sjEnqueuedAt,
+        sjJobId,
+        sjParams,
+        sjQueue,
+        sjStartedAt
+      ),
+    db,
+  )
+import Database.Beam
+  ( MonadBeam,
+    SqlJustable (just_, nothing_),
+    coalesce_,
+    current_,
+    insert,
+    insertValues,
+    runInsert,
+    (<-.),
+  )
+import Database.Beam.Backend.SQL
+  ( BeamSqlBackend,
+    BeamSqlBackendCanSerialize,
+    IsSql92ExpressionSyntax (Sql92ExpressionValueSyntax),
+    IsSql92InsertSyntax (Sql92InsertValuesSyntax),
+    IsSql92InsertValuesSyntax (Sql92InsertValuesExpressionSyntax),
+    IsSql92Syntax (Sql92InsertSyntax),
+  )
+import qualified Database.Beam.Postgres as Pg
+import qualified Database.Beam.Postgres.Full as Pg
+import Database.Beam.Schema.Tables (FieldsFulfillConstraint)
+import qualified Database.Redis as Redis
+import qualified Network.HTTP.Req as Req
+import Network.HostName (getHostName)
+import qualified Options.Applicative as OptParse
+import Paths_meerkat (version)
 
 data Config = Config
-  { cfgHostname     :: Maybe Text
-  , cfgLogging      :: LogConfig
-  , cfgDatabase     :: Pg.ConnectInfo
-  , cfgBinaries     :: BinConfig
-  , cfgSidekiq      :: Maybe SidekiqConfig
-  , cfgPuma         :: Maybe PumaConfig
-  , cfgHoneybadger  :: Maybe HoneybadgerConfig
-  , cfgImporter     :: Maybe ImporterConfig
+  { cfgHostname :: Maybe Text,
+    cfgLogging :: LogConfig,
+    cfgDatabase :: Pg.ConnectInfo,
+    cfgBinaries :: BinConfig,
+    cfgSidekiq :: Maybe SidekiqConfig,
+    cfgPuma :: Maybe PumaConfig,
+    cfgHoneybadger :: Maybe HoneybadgerConfig,
+    cfgImporter :: Maybe ImporterConfig
   }
 
 data BinConfig = BinConfig
-  { cfgDF           :: FilePath
-  , cfgFree         :: FilePath
-  , cfgPidstat      :: FilePath
-  , cfgMysql        :: Maybe FilePath
+  { cfgDF :: FilePath,
+    cfgFree :: FilePath,
+    cfgPidstat :: FilePath,
+    cfgMysql :: Maybe FilePath
   }
 
 defaultBinConfig :: BinConfig
 defaultBinConfig = BinConfig "df" "free" "pidstat" Nothing
 
 data LogConfig = LogConfig
-  { cfgLogFile      :: Maybe FilePath
-  , cfgLogLevel     :: Log.LogLevel
+  { cfgLogFile :: Maybe FilePath,
+    cfgLogLevel :: Log.LogLevel
   }
 
 defaultLogConfig :: LogConfig
 defaultLogConfig = LogConfig Nothing Log.LevelInfo
 
 data SidekiqConfig = SidekiqConfig
-  { cfgSkDatabases  :: [Redis.ConnectInfo]
+  { cfgSkDatabases :: [Redis.ConnectInfo]
   }
 
 data PumaConfig = PumaConfig
-  { cfgPumaCtl      :: PumaCtl
+  { cfgPumaCtl :: PumaCtl
   }
 
 data HoneybadgerConfig = HoneybadgerConfig
-  { cfgHBProjectId    :: Integer
-  , cfgHBEnvironment  :: Text
-  , cfgHBAuthToken    :: ByteString
+  { cfgHBProjectId :: Integer,
+    cfgHBEnvironment :: Text,
+    cfgHBAuthToken :: ByteString
   }
 
 data ImporterConfig = ImporterConfig
-  { cfgIPath          :: FilePath
+  { cfgIPath :: FilePath
   }
 
 instance FromJSON Config where
   parseJSON = withObject "Config" $ \o ->
     Config
       <$> o .:? "hostname"
-      <*> o .:? "logging"  .!= defaultLogConfig
-      <*> o .:  "database"
+      <*> o .:? "logging" .!= defaultLogConfig
+      <*> o .: "database"
       <*> o .:? "binaries" .!= defaultBinConfig
       <*> o .:? "sidekiq"
       <*> o .:? "puma"
@@ -115,104 +213,109 @@ instance FromJSON Config where
 instance FromJSON LogConfig where
   parseJSON = withObject "LogConfig" $ \o ->
     LogConfig
-      <$> o .:? "logfile"  .!= cfgLogFile defaultLogConfig
+      <$> o .:? "logfile" .!= cfgLogFile defaultLogConfig
       <*> o .:? "loglevel" .!= cfgLogLevel defaultLogConfig
 
 instance FromJSON BinConfig where
   parseJSON = withObject "BinConfig" $ \o ->
     BinConfig
-      <$> o .:? "df"       .!= cfgDF defaultBinConfig
-      <*> o .:? "free"     .!= cfgFree defaultBinConfig
-      <*> o .:? "pidstat"  .!= cfgPidstat defaultBinConfig
+      <$> o .:? "df" .!= cfgDF defaultBinConfig
+      <*> o .:? "free" .!= cfgFree defaultBinConfig
+      <*> o .:? "pidstat" .!= cfgPidstat defaultBinConfig
       <*> o .:? "mysql"
 
 instance FromJSON SidekiqConfig where
   parseJSON = withObject "SidekiqConfig" $ \o ->
     SidekiqConfig
-      <$> o .:  "databases"
+      <$> o .: "databases"
 
 instance FromJSON PumaConfig where
   parseJSON = withObject "PumaConfig" $ \o -> do
     PumaCtl url opt <- o .: "url"
     token <- o .: "token"
-    return $ PumaConfig (PumaCtl url (opt <> "token" Req.=: (token::Text)))
+    return $ PumaConfig (PumaCtl url (opt <> "token" Req.=: (token :: Text)))
 
 instance FromJSON HoneybadgerConfig where
   parseJSON = withObject "HoneybadgerConfig" $ \o ->
     HoneybadgerConfig
-      <$> o .:  "project_id"
-      <*> o .:  "environment"
-      <*> (Text.encodeUtf8 <$> o .:  "auth_token")
+      <$> o .: "project_id"
+      <*> o .: "environment"
+      <*> (Text.encodeUtf8 <$> o .: "auth_token")
 
 instance FromJSON ImporterConfig where
   parseJSON = withObject "ImporterConfig" $ \o ->
     ImporterConfig
-      <$> o .:  "path"
+      <$> o .: "path"
 
 -- Orphan
 instance FromJSON Pg.ConnectInfo where
   parseJSON = withObject "ConnectInfo" $ \o ->
     Pg.ConnectInfo
-      <$> o .:? "host"     .!= Pg.connectHost Pg.defaultConnectInfo
-      <*> o .:? "port"     .!= Pg.connectPort Pg.defaultConnectInfo
-      <*> o .:? "user"     .!= "meerkat"
+      <$> o .:? "host" .!= Pg.connectHost Pg.defaultConnectInfo
+      <*> o .:? "port" .!= Pg.connectPort Pg.defaultConnectInfo
+      <*> o .:? "user" .!= "meerkat"
       <*> o .:? "password" .!= Pg.connectPassword Pg.defaultConnectInfo
       <*> o .:? "database" .!= "meerkat"
 
 -- Orphan
 instance FromJSON Redis.ConnectInfo where
-  parseJSON = withText "ConnectInfo" $
-    either fail return . Redis.parseConnectInfo . Text.unpack
+  parseJSON =
+    withText "ConnectInfo" $
+      either fail return . Redis.parseConnectInfo . Text.unpack
 
 -- Orphan
 instance FromJSON Log.LogLevel where
   parseJSON = withText "LogLevel" parseLogLevel
     where
       parseLogLevel "debug" = return Log.LevelDebug
-      parseLogLevel "info"  = return Log.LevelInfo
-      parseLogLevel "warn"  = return Log.LevelWarn
+      parseLogLevel "info" = return Log.LevelInfo
+      parseLogLevel "warn" = return Log.LevelWarn
       parseLogLevel "error" = return Log.LevelError
-      parseLogLevel txt     = fail $ "'" <> Text.unpack txt <> "' is not a valid log level"
+      parseLogLevel txt = fail $ "'" <> Text.unpack txt <> "' is not a valid log level"
 
 newtype MeerkatOptions = MeerkatOptions
   { configFile :: FilePath
   }
 
 meerkatOptions :: OptParse.Parser MeerkatOptions
-meerkatOptions = MeerkatOptions <$> OptParse.strOption
-  (  OptParse.long "config-file"
-  <> OptParse.metavar "PATH"
-  <> OptParse.short 'c'
-  <> OptParse.value "meerkat.yaml"
-  <> OptParse.help "Path to Meerkat configuration file"
-  )
+meerkatOptions =
+  MeerkatOptions
+    <$> OptParse.strOption
+      ( OptParse.long "config-file"
+          <> OptParse.metavar "PATH"
+          <> OptParse.short 'c'
+          <> OptParse.value "meerkat.yaml"
+          <> OptParse.help "Path to Meerkat configuration file"
+      )
 
 data Job = Job
-  { jobDescription  :: Text
-  , jobAction       :: IO ()
-  , jobInterval     :: Maybe NominalDiffTime
-  , jobResult       :: MVar Bool
+  { jobDescription :: Text,
+    jobAction :: IO (),
+    jobInterval :: Maybe NominalDiffTime,
+    jobResult :: MVar Bool
   }
 
 newPeriodicJob :: Text -> IO () -> NominalDiffTime -> IO Job
 newPeriodicJob desc action interval = do
   result <- newMVar True
   return
-    Job { jobDescription  = desc
-        , jobAction       = action
-        , jobInterval     = Just interval
-        , jobResult       = result
-        }
+    Job
+      { jobDescription = desc,
+        jobAction = action,
+        jobInterval = Just interval,
+        jobResult = result
+      }
 
 newStreamingJob :: Text -> IO () -> IO Job
 newStreamingJob desc action = do
   result <- newMVar True
   return
-    Job { jobDescription  = desc
-        , jobAction       = action
-        , jobInterval     = Nothing
-        , jobResult       = result
-        }
+    Job
+      { jobDescription = desc,
+        jobAction = action,
+        jobInterval = Nothing,
+        jobResult = result
+      }
 
 type JobSpec = (UTCTime, Job)
 
@@ -221,8 +324,8 @@ type JobQueue = PQueue.MinPQueue UTCTime Job
 data Running = Running (Async ()) (MVar Bool)
 
 data Scheduler = Scheduler
-  { queue   :: JobQueue
-  , running :: [Running]
+  { queue :: JobQueue,
+    running :: [Running]
   }
 
 data Message m where
@@ -239,66 +342,72 @@ recvMessage = readTBQueue
 main :: IO ()
 main = OptParse.execParser opts >>= initialise
   where
-    opts = OptParse.info
-      (meerkatOptions <**> OptParse.helper)
-      (OptParse.fullDesc <> OptParse.progDesc "Meerkat" <> OptParse.header
-        "Meerkat - monitors your system"
-      )
+    opts =
+      OptParse.info
+        (meerkatOptions <**> OptParse.helper)
+        ( OptParse.fullDesc <> OptParse.progDesc "Meerkat"
+            <> OptParse.header
+              "Meerkat - monitors your system"
+        )
 
-    initialise MeerkatOptions{..} =
+    initialise MeerkatOptions {..} =
       decodeFileEither configFile >>= either parseError runApp
 
     parseError e = do
       putStrLn "Unable to parse configuration file"
       putStrLn $ prettyPrintParseException e
 
-    runApp cfg@Config{..} = do
+    runApp cfg@Config {..} = do
       let withLogging = maybe Log.withStdoutLogging Log.withFileLogging (cfgLogFile cfgLogging)
       withLogging $ do
         Log.setLogLevel (cfgLogLevel cfgLogging)
         app cfg
 
 app :: Config -> IO ()
-app Config{..} = do
+app Config {..} = do
   msgq <- atomically $ newTBQueue 1000
-  shutdown <- atomically $ newTVar False
+  shutdown <- newTVarIO False
   hostname <- maybe (Text.pack <$> getHostName) return cfgHostname
   now <- getCurrentTime
-  Log.log $ Text.unwords
-    [ "Meerkat"
-    , Text.pack (showVersion version)
-    , "started on"
-    , hostname
-    , "at"
-    , showTxt now
-    ]
+  Log.log $
+    Text.unwords
+      [ "Meerkat",
+        Text.pack (showVersion version),
+        "started on",
+        hostname,
+        "at",
+        showTxt now
+      ]
 
-  df  <- newPeriodicJob "Check disk space usage" (diskspace msgq (cfgDF cfgBinaries) hostname) 60
+  df <- newPeriodicJob "Check disk space usage" (diskspace msgq (cfgDF cfgBinaries) hostname) 60
   mem <- newPeriodicJob "Check memory usage" (memory msgq (cfgFree cfgBinaries) hostname) 20
-  p   <- traverse (\cfg -> newPeriodicJob "Poll Puma statistics" (puma msgq (cfgPumaCtl cfg) hostname) 20) cfgPuma
-  hb  <- traverse (\cfg -> newPeriodicJob "Poll Honeybadger" (honeybadger msgq cfg) 600) cfgHoneybadger
-  i   <- traverse (\cfg -> newPeriodicJob "Importer" (importer msgq cfg) 60) cfgImporter
+  p <- traverse (\cfg -> newPeriodicJob "Poll Puma statistics" (puma msgq (cfgPumaCtl cfg) hostname) 20) cfgPuma
+  hb <- traverse (\cfg -> newPeriodicJob "Poll Honeybadger" (honeybadger msgq cfg) 600) cfgHoneybadger
+  i <- traverse (\cfg -> newPeriodicJob "Importer" (importer msgq cfg) 60) cfgImporter
   pidstat1 <- newPeriodicJob "Check process statistics" (pidstats msgq (cfgPidstat cfgBinaries) hostname) 120
   pidstat2 <- newPeriodicJob "Check process statistics" (pidstats msgq (cfgPidstat cfgBinaries) hostname) 120
-  my  <- traverse (\bin -> newPeriodicJob "MySql processlist" (mysql msgq bin hostname) 60) (cfgMysql cfgBinaries)
-  sk  <- traverse (\cfg -> newPeriodicJob "Check sidekiq queues" (sidekiq msgq cfg) 60) cfgSidekiq
-  let queue = PQueue.fromList $ catMaybes
-                [ Just (now, df)
-                , Just (now, mem)
-                , (now, ) <$> sk
-                , (now, ) <$> p
-                , (now, ) <$> hb
-                , (now, ) <$> i
-                , (now, ) <$> my
-                -- run two instances of pidstat, each triggered every 2 mins
-                -- each one is expected to collect stats for 1 minute
-                , Just (now, pidstat1)
-                , Just (addUTCTime 60 now, pidstat2)
-                ]
-  logger <- async $
-    -- Pool with just a single connection that closes after 120s of idle
-    createPool (Pg.connect cfgDatabase) Pg.close 1 120 1 >>=
-      dbLogger msgq shutdown
+  my <- traverse (\bin -> newPeriodicJob "MySql processlist" (mysql msgq bin hostname) 60) (cfgMysql cfgBinaries)
+  sk <- traverse (\cfg -> newPeriodicJob "Check sidekiq queues" (sidekiq msgq cfg) 60) cfgSidekiq
+  let queue =
+        PQueue.fromList $
+          catMaybes
+            [ Just (now, df),
+              Just (now, mem),
+              (now,) <$> sk,
+              (now,) <$> p,
+              (now,) <$> hb,
+              (now,) <$> i,
+              (now,) <$> my,
+              -- run two instances of pidstat, each triggered every 2 mins
+              -- each one is expected to collect stats for 1 minute
+              Just (now, pidstat1),
+              Just (addUTCTime 60 now, pidstat2)
+            ]
+  logger <-
+    async $
+      -- Pool with just a single connection that closes after 120s of idle
+      createPool (Pg.connect cfgDatabase) Pg.close 1 120 1
+        >>= dbLogger msgq shutdown
 
   runScheduler (Scheduler queue [])
 
@@ -310,11 +419,11 @@ data LoggerResult
   = LoggerContinue
   | LoggerDone
 
-dbLogger
-  :: MessageQueue Pg.Pg
-  -> TVar Bool
-  -> Pool Pg.Connection
-  -> IO ()
+dbLogger ::
+  MessageQueue Pg.Pg ->
+  TVar Bool ->
+  Pool Pg.Connection ->
+  IO ()
 dbLogger msgq shutdown pool = loop initialBackoff
   where
     loop backoff = do
@@ -330,8 +439,9 @@ dbLogger msgq shutdown pool = loop initialBackoff
         Right LoggerDone -> return ()
 
     logData conn = do
-      action <- atomically $
-        (Right <$> recvMessage msgq) `orElse` (Left <$> checkShutdown)
+      action <-
+        atomically $
+          (Right <$> recvMessage msgq) `orElse` (Left <$> checkShutdown)
       case action of
         Left () ->
           return LoggerDone
@@ -341,17 +451,18 @@ dbLogger msgq shutdown pool = loop initialBackoff
 
     checkShutdown = check =<< readTVar shutdown
 
-    initialBackoff = 1  -- 1 sec
-    maxBackoff = 300    -- 5 min
+    initialBackoff = 1 -- 1 sec
+    maxBackoff = 300 -- 5 min
 
 type InsertValueSyntax cmd = Sql92ExpressionValueSyntax (Sql92InsertValuesExpressionSyntax (Sql92InsertValuesSyntax (Sql92InsertSyntax cmd)))
 
-diskspace
-  :: forall be m. ( BeamSqlBackend be , MonadBeam be m , FieldsFulfillConstraint (BeamSqlBackendCanSerialize be) DiskSpaceUsageT )
-  => MessageQueue m
-  -> FilePath
-  -> Text
-  -> IO ()
+diskspace ::
+  forall be m.
+  (BeamSqlBackend be, MonadBeam be m, FieldsFulfillConstraint (BeamSqlBackendCanSerialize be) DiskSpaceUsageT) =>
+  MessageQueue m ->
+  FilePath ->
+  Text ->
+  IO ()
 diskspace msgq bin hostname = do
   now <- getCurrentTime
   exceptT
@@ -362,12 +473,13 @@ diskspace msgq bin hostname = do
     insertAction :: [DiskSpaceUsage] -> m ()
     insertAction = runInsert . insert (dbDiskSpaceUsage db) . insertValues
 
-memory
-  :: forall be m. ( BeamSqlBackend be , MonadBeam be m , FieldsFulfillConstraint (BeamSqlBackendCanSerialize be) MemoryUsageT )
-  => MessageQueue m
-  -> FilePath
-  -> Text
-  -> IO ()
+memory ::
+  forall be m.
+  (BeamSqlBackend be, MonadBeam be m, FieldsFulfillConstraint (BeamSqlBackendCanSerialize be) MemoryUsageT) =>
+  MessageQueue m ->
+  FilePath ->
+  Text ->
+  IO ()
 memory msgq bin hostname = do
   now <- getCurrentTime
   exceptT
@@ -378,12 +490,13 @@ memory msgq bin hostname = do
     insertAction :: [MemoryUsage] -> m ()
     insertAction = runInsert . insert (dbMemoryUsage db) . insertValues
 
-sidekiq
-  :: forall be m. ( BeamSqlBackend be , MonadBeam be m , FieldsFulfillConstraint (BeamSqlBackendCanSerialize be) SidekiqQueueT )
-  => MessageQueue m
-  -> SidekiqConfig
-  -> IO ()
-sidekiq msgq SidekiqConfig{..} = do
+sidekiq ::
+  forall be m.
+  (BeamSqlBackend be, MonadBeam be m, FieldsFulfillConstraint (BeamSqlBackendCanSerialize be) SidekiqQueueT) =>
+  MessageQueue m ->
+  SidekiqConfig ->
+  IO ()
+sidekiq msgq SidekiqConfig {..} = do
   now <- getCurrentTime
   exceptT
     print
@@ -393,12 +506,13 @@ sidekiq msgq SidekiqConfig{..} = do
     insertAction :: [SidekiqQueue] -> m ()
     insertAction = runInsert . insert (dbSidekiqQueues db) . insertValues
 
-pidstats
-  :: forall be m. ( BeamSqlBackend be , MonadBeam be m , FieldsFulfillConstraint (BeamSqlBackendCanSerialize be) ProcessStatsT )
-  => MessageQueue m
-  -> FilePath
-  -> Text
-  -> IO ()
+pidstats ::
+  forall be m.
+  (BeamSqlBackend be, MonadBeam be m, FieldsFulfillConstraint (BeamSqlBackendCanSerialize be) ProcessStatsT) =>
+  MessageQueue m ->
+  FilePath ->
+  Text ->
+  IO ()
 pidstats msgq bin hostname =
   exceptT
     print
@@ -408,12 +522,13 @@ pidstats msgq bin hostname =
     insertAction :: [ProcessStats] -> m ()
     insertAction = runInsert . insert (dbProcessStats db) . insertValues
 
-puma
-  :: forall be m. ( BeamSqlBackend be , MonadBeam be m , FieldsFulfillConstraint (BeamSqlBackendCanSerialize be) PumaT )
-  => MessageQueue m
-  -> PumaCtl
-  -> Text
-  -> IO ()
+puma ::
+  forall be m.
+  (BeamSqlBackend be, MonadBeam be m, FieldsFulfillConstraint (BeamSqlBackendCanSerialize be) PumaT) =>
+  MessageQueue m ->
+  PumaCtl ->
+  Text ->
+  IO ()
 puma msgq ctl hostname = do
   now <- getCurrentTime
   exceptT
@@ -424,12 +539,13 @@ puma msgq ctl hostname = do
     insertAction :: [Puma] -> m ()
     insertAction = runInsert . insert (dbPuma db) . insertValues
 
-honeybadger
-  :: forall be m. ( BeamSqlBackend be , MonadBeam be m , FieldsFulfillConstraint (BeamSqlBackendCanSerialize be) HoneybadgerT )
-  => MessageQueue m
-  -> HoneybadgerConfig
-  -> IO ()
-honeybadger msgq HoneybadgerConfig{..} = do
+honeybadger ::
+  forall be m.
+  (BeamSqlBackend be, MonadBeam be m, FieldsFulfillConstraint (BeamSqlBackendCanSerialize be) HoneybadgerT) =>
+  MessageQueue m ->
+  HoneybadgerConfig ->
+  IO ()
+honeybadger msgq HoneybadgerConfig {..} = do
   now <- getCurrentTime
   exceptT
     print
@@ -439,12 +555,13 @@ honeybadger msgq HoneybadgerConfig{..} = do
     insertAction :: [Honeybadger] -> m ()
     insertAction = runInsert . insert (dbHoneybadger db) . insertValues
 
-mysql
-  :: forall be m. ( BeamSqlBackend be , MonadBeam be m , FieldsFulfillConstraint (BeamSqlBackendCanSerialize be) MysqlProcessListT )
-  => MessageQueue m
-  -> FilePath
-  -> Text
-  -> IO ()
+mysql ::
+  forall be m.
+  (BeamSqlBackend be, MonadBeam be m, FieldsFulfillConstraint (BeamSqlBackendCanSerialize be) MysqlProcessListT) =>
+  MessageQueue m ->
+  FilePath ->
+  Text ->
+  IO ()
 mysql msgq bin hostname = do
   now <- getCurrentTime
   exceptT
@@ -461,23 +578,24 @@ groupEntries entries =
   where
     go es = mconcat (map byGroup es)
     byGroup (ActionControllerEntry x) = ([x], [])
-    byGroup (SidekiqJobEntry x)       = ([], [x])
+    byGroup (SidekiqJobEntry x) = ([], [x])
     dedup = HM.elems . HM.fromListWith sjcoalesce . map (\sj -> (sjJobId sj, sj))
     sjcoalesce a b =
-      SidekiqJobT { sjJobId        = sjJobId b
-                  , sjQueue        = sjQueue b
-                  , sjClass        = sjClass b
-                  , sjParams       = sjParams b
-                  , sjEnqueuedAt   = sjEnqueuedAt b
-                  , sjStartedAt    = sjStartedAt b <|> sjStartedAt a
-                  , sjCompletedAt  = sjCompletedAt b <|> sjCompletedAt a
-                  }
+      SidekiqJobT
+        { sjJobId = sjJobId b,
+          sjQueue = sjQueue b,
+          sjClass = sjClass b,
+          sjParams = sjParams b,
+          sjEnqueuedAt = sjEnqueuedAt b,
+          sjStartedAt = sjStartedAt b <|> sjStartedAt a,
+          sjCompletedAt = sjCompletedAt b <|> sjCompletedAt a
+        }
 
-importer
-  :: MessageQueue Pg.Pg
-  -> ImporterConfig
-  -> IO ()
-importer msgq ImporterConfig{..} =
+importer ::
+  MessageQueue Pg.Pg ->
+  ImporterConfig ->
+  IO ()
+importer msgq ImporterConfig {..} =
   exceptT
     print
     (atomically . sendMessage msgq . SampleData . insertAction)
@@ -491,27 +609,31 @@ importer msgq ImporterConfig{..} =
 
     insertActionControllerEntries :: [ActionController] -> Pg.Pg ()
     insertActionControllerEntries es =
-      runInsert $ insert (dbActionController db)
-                $ insertValues es
+      runInsert $
+        insert (dbActionController db) $
+          insertValues es
 
     insertSidekiqJobEntries :: [SidekiqJob] -> Pg.Pg ()
     insertSidekiqJobEntries es =
-      runInsert $ Pg.insert (dbSidekiqJobs db)
-                ( insertValues es )
-                ( Pg.onConflict
-                  (Pg.conflictingFields sjJobId)
-                  (Pg.onConflictUpdateSet
-                    (\tbl tblExcl -> mconcat
-                      [ sjQueue tbl <-. sjQueue tblExcl
-                      , sjClass tbl <-. sjClass tblExcl
-                      , sjParams tbl <-. sjParams tblExcl
-                      , sjEnqueuedAt tbl <-. sjEnqueuedAt tblExcl
-                      , sjStartedAt tbl <-. coalesce_ [ just_ (sjStartedAt tblExcl), just_ (current_ (sjStartedAt tbl)) ] nothing_
-                      , sjCompletedAt tbl <-. coalesce_ [ just_ (sjCompletedAt tblExcl), just_ (current_ (sjCompletedAt tbl)) ] nothing_
-                      ]
-                    )
+      runInsert $
+        Pg.insert
+          (dbSidekiqJobs db)
+          (insertValues es)
+          ( Pg.onConflict
+              (Pg.conflictingFields sjJobId)
+              ( Pg.onConflictUpdateSet
+                  ( \tbl tblExcl ->
+                      mconcat
+                        [ sjQueue tbl <-. sjQueue tblExcl,
+                          sjClass tbl <-. sjClass tblExcl,
+                          sjParams tbl <-. sjParams tblExcl,
+                          sjEnqueuedAt tbl <-. sjEnqueuedAt tblExcl,
+                          sjStartedAt tbl <-. coalesce_ [just_ (sjStartedAt tblExcl), just_ (current_ (sjStartedAt tbl))] nothing_,
+                          sjCompletedAt tbl <-. coalesce_ [just_ (sjCompletedAt tblExcl), just_ (current_ (sjCompletedAt tbl))] nothing_
+                        ]
                   )
-                )
+              )
+          )
 
 runScheduler :: Scheduler -> IO ()
 runScheduler scheduler =
@@ -549,7 +671,7 @@ schedule s = do
 reap :: Scheduler -> IO Scheduler
 reap Scheduler {..} = do
   running' <- concat <$> mapM reaper running
-  return Scheduler { running = running', .. }
+  return Scheduler {running = running', ..}
   where
     reaper (Running a mvar) = do
       result <- poll a
@@ -572,10 +694,8 @@ sow now s@Scheduler {..} =
     Nothing -> return (s, 0)
     Just (jobTime, job) ->
       if now < jobTime
-      then
-        return (s, diffUTCTime jobTime now)
-      else
-        start s jobTime job >>= sow now
+        then return (s, diffUTCTime jobTime now)
+        else start s jobTime job >>= sow now
 
 -- Attempt to start a job if it's not already running, and add it to the
 -- running set.
@@ -589,8 +709,8 @@ start s@Scheduler {..} jobTime job = do
       return s
     Just _ -> do
       a <- async $ jobAction job
-      return s { running = Running a (jobResult job) : running }
-  return s' { queue = reschedule jobTime job queue }
+      return s {running = Running a (jobResult job) : running}
+  return s' {queue = reschedule jobTime job queue}
 
 -- Reschedule the job on the top of the jobqueue
 -- 1) Remove it from the top

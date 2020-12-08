@@ -1,28 +1,32 @@
-{-# LANGUAGE FlexibleContexts   #-}
-{-# LANGUAGE FlexibleInstances  #-}
-{-# LANGUAGE RecordWildCards    #-}
-{-# LANGUAGE TypeFamilies       #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Check.DiskSpaceUsage
-  ( DiskSpaceUsage
-  , DiskSpaceUsageT (..)
-  , freespace
+  ( DiskSpaceUsage,
+    DiskSpaceUsageT (..),
+    freespace,
   )
 where
 
-import           Control.Applicative        (empty)
-import           Control.Error
-import           Control.Monad.IO.Class     (liftIO)
-import qualified Data.Char                  as Char
-import qualified Data.Text                  as Text
-import qualified Data.Text.Lazy             as LText
-import qualified Data.Text.Lazy.Encoding    as Text
-import           Data.Time.Clock            (UTCTime)
-import           Data.Void                  (Void)
-import           Database
-import           System.Process.Typed       as Proc
-import qualified Text.Megaparsec            as M
-import qualified Text.Megaparsec.Char       as C
+import Control.Applicative (empty)
+import Control.Error (ExceptT, throwE)
+import Control.Monad.IO.Class (liftIO)
+import qualified Data.Char as Char
+import qualified Data.Text as Text
+import qualified Data.Text.Lazy as LText
+import qualified Data.Text.Lazy.Encoding as Text
+import Data.Time.Clock (UTCTime)
+import Data.Void (Void)
+import Database (DiskSpaceUsage, DiskSpaceUsageT (..))
+import System.Process.Typed as Proc
+  ( ProcessConfig,
+    proc,
+    readProcess_,
+  )
+import qualified Text.Megaparsec as M
+import qualified Text.Megaparsec.Char as C
 import qualified Text.Megaparsec.Char.Lexer as L
 
 type Parser = M.Parsec Void LText.Text
@@ -43,9 +47,9 @@ usage :: Text.Text -> UTCTime -> Parser DiskSpaceUsage
 usage duHost duTime = do
   duSource <- str
   duFstype <- str
-  duSize   <- int
-  duUsed   <- int
-  duAvail  <- int
+  duSize <- int
+  duUsed <- int
+  duAvail <- int
   duTarget <- str
   return DiskSpaceUsageT {..}
 
