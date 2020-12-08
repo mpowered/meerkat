@@ -1,31 +1,35 @@
-{-# LANGUAGE FlexibleContexts   #-}
-{-# LANGUAGE FlexibleInstances  #-}
-{-# LANGUAGE OverloadedStrings  #-}
-{-# LANGUAGE TypeFamilies       #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Check.ProcessStatistics
-  ( ProcessStats
-  , ProcessStatsT (..)
-  , processes
+  ( ProcessStats,
+    ProcessStatsT (..),
+    processes,
   )
 where
 
-import           Control.Applicative
-import           Control.Error
-import           Control.Monad
-import           Control.Monad.IO.Class     (liftIO)
-import qualified Data.Char                  as Char
-import           Data.Scientific
-import qualified Data.Text                  as Text
-import qualified Data.Text.Lazy             as LText
-import qualified Data.Text.Lazy.Encoding    as Text
-import           Data.Time.Clock            (UTCTime (..), getCurrentTime)
-import           Data.Time.Format           (parseTimeM, defaultTimeLocale)
-import           Data.Void                  (Void)
-import           Database
-import           System.Process.Typed       as Proc
-import qualified Text.Megaparsec            as M
-import qualified Text.Megaparsec.Char       as C
+import Control.Applicative (Alternative (empty, many, (<|>)))
+import Control.Error (ExceptT, throwE)
+import Control.Monad (foldM, when)
+import Control.Monad.IO.Class (liftIO)
+import qualified Data.Char as Char
+import Data.Scientific (Scientific)
+import qualified Data.Text as Text
+import qualified Data.Text.Lazy as LText
+import qualified Data.Text.Lazy.Encoding as Text
+import Data.Time.Clock (UTCTime (..), getCurrentTime)
+import Data.Time.Format (defaultTimeLocale, parseTimeM)
+import Data.Void (Void)
+import Database (ProcessStats, ProcessStatsT (..))
+import System.Process.Typed as Proc
+  ( ProcessConfig,
+    proc,
+    readProcess_,
+  )
+import qualified Text.Megaparsec as M
+import qualified Text.Megaparsec.Char as C
 import qualified Text.Megaparsec.Char.Lexer as L
 
 {-
@@ -70,33 +74,32 @@ pidstats fields host timestamp = do
   when (psCommand stats == psCommand blank) $
     fail "Unable to find command when parsing process statistics"
   return stats
-
   where
-    field ps "Time"     = ps <$ utctime
-    field ps "Command"  = (\x -> ps { psCommand = Text.unwords x }) <$> many str
-    field ps "%CPU"     = (\x -> ps { psCpu = Just x }) <$> sci
-    field ps "%usr"     = (\x -> ps { psUserCpu = Just x }) <$> sci
-    field ps "%system"  = (\x -> ps { psSysCpu = Just x }) <$> sci
-    field ps "%guest"   = (\x -> ps { psGuestCpu = Just x }) <$> sci
-    field ps "%wait"    = (\x -> ps { psWaitCpu = Just x }) <$> sci
-    field ps "VSZ"      = (\x -> ps { psVirtualMem = Just x }) <$> int
-    field ps "RSS"      = (\x -> ps { psResidentMem = Just x }) <$> int
-    field ps "%MEM"     = (\x -> ps { psMem = Just x }) <$> sci
-    field ps _          = ps <$ str
+    field ps "Time" = ps <$ utctime
+    field ps "Command" = (\x -> ps {psCommand = Text.unwords x}) <$> many str
+    field ps "%CPU" = (\x -> ps {psCpu = Just x}) <$> sci
+    field ps "%usr" = (\x -> ps {psUserCpu = Just x}) <$> sci
+    field ps "%system" = (\x -> ps {psSysCpu = Just x}) <$> sci
+    field ps "%guest" = (\x -> ps {psGuestCpu = Just x}) <$> sci
+    field ps "%wait" = (\x -> ps {psWaitCpu = Just x}) <$> sci
+    field ps "VSZ" = (\x -> ps {psVirtualMem = Just x}) <$> int
+    field ps "RSS" = (\x -> ps {psResidentMem = Just x}) <$> int
+    field ps "%MEM" = (\x -> ps {psMem = Just x}) <$> sci
+    field ps _ = ps <$ str
 
     blank =
       ProcessStatsT
-        { psTime        = timestamp
-        , psHost        = host
-        , psCommand     = ""
-        , psCpu         = Nothing
-        , psUserCpu     = Nothing
-        , psSysCpu      = Nothing
-        , psGuestCpu    = Nothing
-        , psWaitCpu     = Nothing
-        , psVirtualMem  = Nothing
-        , psResidentMem = Nothing
-        , psMem         = Nothing
+        { psTime = timestamp,
+          psHost = host,
+          psCommand = "",
+          psCpu = Nothing,
+          psUserCpu = Nothing,
+          psSysCpu = Nothing,
+          psGuestCpu = Nothing,
+          psWaitCpu = Nothing,
+          psVirtualMem = Nothing,
+          psResidentMem = Nothing,
+          psMem = Nothing
         }
 
 data Line
@@ -107,14 +110,15 @@ data Line
 
 line :: Text.Text -> UTCTime -> [Text.Text] -> Parser Line
 line host timestamp headers =
-      (EOF <$ M.eof)
-  <|> (Header <$> header <* C.eol)
-  <|> (Stats <$> pidstats headers host timestamp <* C.eol)
+  (EOF <$ M.eof)
+    <|> (Header <$> header <* C.eol)
+    <|> (Stats <$> pidstats headers host timestamp <* C.eol)
 
 preamble :: Parser Line
-preamble = (EOF <$ M.eof)
-       <|> (Header <$> header <* C.eol)
-       <|> (Preamble <$ M.label "preamble" (M.many str) <* C.eol)
+preamble =
+  (EOF <$ M.eof)
+    <|> (Header <$> header <* C.eol)
+    <|> (Preamble <$ M.label "preamble" (M.many str) <* C.eol)
 
 parser :: Text.Text -> UTCTime -> Parser [ProcessStats]
 parser host timestamp = go []

@@ -1,0 +1,11 @@
+--- a/beam-core.cabal	2020-12-08 10:40:48.487457453 +0200
++++ b/beam-core.cabal	2020-12-08 10:40:39.524444506 +0200
+@@ -61,7 +61,7 @@
+                        Database.Beam.Schema.Lenses
+ 
+   build-depends:       base         >=4.9     && <5.0,
+-                       aeson        >=0.11    && <1.5,
++                       aeson        >=0.11    && <1.6,
+                        text         >=1.2.2.0 && <1.3,
+                        bytestring   >=0.10    && <0.11,
+                        mtl          >=2.2.1   && <2.3,

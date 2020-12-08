@@ -1,0 +1,155 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.34.2.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: df707ca0c86b7741e4a90d3d45af3d1f6d5c8d6b045395699a481064c17e1266
+
+name:           meerkat
+version:        0.5.0.0
+description:    Please see the README on GitHub at <https://github.com/mpowered/meerkat#readme>
+homepage:       https://github.com/mpowered/meerkat#readme
+bug-reports:    https://github.com/mpowered/meerkat/issues
+author:         Shaun Sharples
+maintainer:     shaun.sharples@gmail.com
+copyright:      2020 Shaun Sharples
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    ChangeLog.md
+
+source-repository head
+  type: git
+  location: https://github.com/mpowered/meerkat
+
+library
+  exposed-modules:
+      Check.DiskSpaceUsage
+      Check.Honeybadger
+      Check.Importer
+      Check.MemoryUsage
+      Check.Mysql
+      Check.ProcessStatistics
+      Check.Puma
+      Check.SidekiqQueues
+      Database
+  other-modules:
+      Paths_meerkat
+  hs-source-dirs:
+      src
+  ghc-options: -Wall -O2
+  build-depends:
+      aeson >=1.5 && <1.6
+    , aeson-extra >=0.4 && <0.5
+    , async >=2.2 && <2.3
+    , base >=4.7 && <5
+    , beam-core >=0.9 && <0.10
+    , beam-postgres >=0.5 && <0.6
+    , bytestring >=0.10 && <0.11
+    , directory >=1.3 && <1.4
+    , errors >=2.3 && <2.4
+    , filepath >=1.4 && <1.5
+    , hedis >=0.13 && <0.14
+    , hostname >=1.0 && <1.1
+    , logging >=3.0 && <3.1
+    , megaparsec >=9.0 && <9.1
+    , modern-uri >=0.3 && <0.4
+    , optparse-applicative >=0.15 && <0.16
+    , pqueue >=1.4 && <1.5
+    , recursion-schemes >=5.2 && <5.3
+    , req >=3.8 && <3.9
+    , resource-pool >=0.2 && <0.3
+    , scientific >=0.3 && <0.4
+    , stm >=2.5 && <2.6
+    , text >=1.2 && <1.3
+    , time >=1.9 && <1.10
+    , typed-process >=0.2 && <0.3
+    , unordered-containers >=0.2 && <0.3
+    , vector >=0.12 && <0.13
+    , xeno >=0.4 && <0.5
+    , yaml >=0.11 && <0.12
+  default-language: Haskell2010
+
+executable meerkat
+  main-is: Main.hs
+  other-modules:
+      Paths_meerkat
+  hs-source-dirs:
+      app
+  ghc-options: -Wall -O2 -threaded -rtsopts -with-rtsopts=-N -I0
+  build-depends:
+      aeson >=1.5 && <1.6
+    , aeson-extra >=0.4 && <0.5
+    , async >=2.2 && <2.3
+    , base >=4.7 && <5
+    , beam-core >=0.9 && <0.10
+    , beam-postgres >=0.5 && <0.6
+    , bytestring >=0.10 && <0.11
+    , directory >=1.3 && <1.4
+    , errors >=2.3 && <2.4
+    , filepath >=1.4 && <1.5
+    , hedis >=0.13 && <0.14
+    , hostname >=1.0 && <1.1
+    , logging >=3.0 && <3.1
+    , meerkat
+    , megaparsec >=9.0 && <9.1
+    , modern-uri >=0.3 && <0.4
+    , optparse-applicative >=0.15 && <0.16
+    , pqueue >=1.4 && <1.5
+    , recursion-schemes >=5.2 && <5.3
+    , req >=3.8 && <3.9
+    , resource-pool >=0.2 && <0.3
+    , scientific >=0.3 && <0.4
+    , stm >=2.5 && <2.6
+    , text >=1.2 && <1.3
+    , time >=1.9 && <1.10
+    , typed-process >=0.2 && <0.3
+    , unordered-containers >=0.2 && <0.3
+    , vector >=0.12 && <0.13
+    , xeno >=0.4 && <0.5
+    , yaml >=0.11 && <0.12
+  default-language: Haskell2010
+
+test-suite spec
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_meerkat
+  hs-source-dirs:
+      test
+  ghc-options: -Wall -O2
+  build-depends:
+      aeson >=1.5 && <1.6
+    , aeson-extra >=0.4 && <0.5
+    , async >=2.2 && <2.3
+    , base >=4.7 && <5
+    , beam-core >=0.9 && <0.10
+    , beam-postgres >=0.5 && <0.6
+    , bytestring >=0.10 && <0.11
+    , directory >=1.3 && <1.4
+    , errors >=2.3 && <2.4
+    , filepath >=1.4 && <1.5
+    , hedis >=0.13 && <0.14
+    , hostname >=1.0 && <1.1
+    , logging >=3.0 && <3.1
+    , meerkat
+    , megaparsec >=9.0 && <9.1
+    , modern-uri >=0.3 && <0.4
+    , optparse-applicative >=0.15 && <0.16
+    , pqueue >=1.4 && <1.5
+    , recursion-schemes >=5.2 && <5.3
+    , req >=3.8 && <3.9
+    , resource-pool >=0.2 && <0.3
+    , scientific >=0.3 && <0.4
+    , stm >=2.5 && <2.6
+    , text >=1.2 && <1.3
+    , time >=1.9 && <1.10
+    , typed-process >=0.2 && <0.3
+    , unordered-containers >=0.2 && <0.3
+    , vector >=0.12 && <0.13
+    , xeno >=0.4 && <0.5
+    , yaml >=0.11 && <0.12
+  default-language: Haskell2010
