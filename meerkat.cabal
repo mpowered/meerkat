@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 0e754a170497de5298f5fcacd4370a8307bdb7dad6c79cb40360a5551fe4e8b7
+-- hash: 6db0934d02e7f9b2143111d55007ae87b28a19af3191fa914dd733a20dee9282
 
 name:           meerkat
 version:        0.5.0.1
@@ -79,7 +79,7 @@ executable meerkat
       Paths_meerkat
   hs-source-dirs:
       app
-  ghc-options: -Wall -O2 -threaded -rtsopts -with-rtsopts=-N -I0
+  ghc-options: -Wall -O2 -threaded -rtsopts "-with-rtsopts=-N -Iw60 --disable-delayed-os-memory-return"
   build-depends:
       aeson >=1.5 && <1.6
     , aeson-extra >=0.4 && <0.5

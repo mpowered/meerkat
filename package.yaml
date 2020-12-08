@@ -56,7 +56,7 @@ executables:
     ghc-options:
     - -threaded
     - -rtsopts
-    - "-with-rtsopts=-N -I0"
+    - '"-with-rtsopts=-N -Iw60 --disable-delayed-os-memory-return"'
     dependencies:
     - meerkat
 
