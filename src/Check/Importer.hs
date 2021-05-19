@@ -32,6 +32,8 @@ import Database
     ActionControllerT (ActionControllerT),
     SidekiqJob,
     SidekiqJobT (SidekiqJobT),
+    BushpigJob,
+    BushpigJobT (BushpigJobT),
   )
 import System.Directory
   ( doesFileExist,
@@ -44,6 +46,7 @@ import System.FilePath (isExtensionOf, (</>))
 data Entry
   = ActionControllerEntry ActionController
   | SidekiqJobEntry SidekiqJob
+  | BushpigJobEntry BushpigJob
 
 instance FromJSON Entry where
   parseJSON = withObject "Entry" $ \e -> do
@@ -51,6 +54,7 @@ instance FromJSON Entry where
     case ty of
       "action_controller" -> actionController e
       "sidekiq_job" -> sidekiqJob e
+      "bushpig_job" -> bushpigJob e
       invalid -> fail ("unexpected Entry type " <> invalid)
     where
       actionController e =
@@ -82,6 +86,16 @@ instance FromJSON Entry where
                   <*> e .: "class"
                   <*> (clean <$> (e .: "params"))
                   <*> e .: "enqueued_at"
+                  <*> e .:? "started_at"
+                  <*> e .:? "completed_at"
+              )
+      bushpigJob e =
+        BushpigJobEntry
+          <$> ( BushpigJobT
+                  <$> e .: "id"
+                  <*> e .: "jid"
+                  <*> e .: "class"
+                  <*> (clean <$> (e .: "params"))
                   <*> e .:? "started_at"
                   <*> e .:? "completed_at"
               )

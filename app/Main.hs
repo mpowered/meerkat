@@ -102,6 +102,7 @@ import Database
   ( ActionController,
     DB
       ( dbActionController,
+        dbBushpigJobs,
         dbDiskSpaceUsage,
         dbHoneybadger,
         dbMemoryUsage,
@@ -121,6 +122,16 @@ import Database
         sjParams,
         sjQueue,
         sjStartedAt
+      ),
+    BushpigJob,
+    BushpigJobT
+      ( BushpigJobT,
+        bjClass,
+        bjCompletedAt,
+        bjId,
+        bjJobId,
+        bjParams,
+        bjStartedAt
       ),
     db,
   )
@@ -570,14 +581,16 @@ mysql msgq bin hostname = do
     insertAction :: [MysqlProcessList] -> m ()
     insertAction = runInsert . insert (dbMysqlProcesslist db) . insertValues
 
-groupEntries :: [Entry] -> ([ActionController], [SidekiqJob])
+groupEntries :: [Entry] -> ([ActionController], [SidekiqJob], [BushpigJob])
 groupEntries entries =
-  let (acs, sjs) = go entries in (acs, dedup sjs)
+  let (acs, sjs, bjs) = go entries in (acs, dedupSJ sjs, dedupBJ bjs)
   where
     go es = mconcat (map byGroup es)
-    byGroup (ActionControllerEntry x) = ([x], [])
-    byGroup (SidekiqJobEntry x) = ([], [x])
-    dedup = HM.elems . HM.fromListWith sjcoalesce . map (\sj -> (sjJobId sj, sj))
+    byGroup (ActionControllerEntry x) = ([x], [], [])
+    byGroup (SidekiqJobEntry x) = ([], [x], [])
+    byGroup (BushpigJobEntry x) = ([], [], [x])
+    dedupSJ = HM.elems . HM.fromListWith sjcoalesce . map (\sj -> (sjJobId sj, sj))
+    dedupBJ = HM.elems . HM.fromListWith bjcoalesce . map (\bj -> (bjId bj, bj))
     sjcoalesce a b =
       SidekiqJobT
         { sjJobId = sjJobId b,
@@ -587,6 +600,15 @@ groupEntries entries =
           sjEnqueuedAt = sjEnqueuedAt b,
           sjStartedAt = sjStartedAt b <|> sjStartedAt a,
           sjCompletedAt = sjCompletedAt b <|> sjCompletedAt a
+        }
+    bjcoalesce a b =
+      BushpigJobT
+        { bjId = bjId b,
+          bjJobId = bjJobId b,
+          bjClass = bjClass b,
+          bjParams = bjParams b,
+          bjStartedAt = bjStartedAt b <|> bjStartedAt a,
+          bjCompletedAt = bjCompletedAt b <|> bjCompletedAt a
         }
 
 importer ::
@@ -601,9 +623,10 @@ importer msgq ImporterConfig {..} =
   where
     insertAction :: [Entry] -> Pg.Pg ()
     insertAction entries = do
-      let (ac, sj) = groupEntries entries
+      let (ac, sj, bj) = groupEntries entries
       unless (null ac) $ insertActionControllerEntries ac
       unless (null sj) $ insertSidekiqJobEntries sj
+      unless (null bj) $ insertBushpigJobEntries bj
 
     insertActionControllerEntries :: [ActionController] -> Pg.Pg ()
     insertActionControllerEntries es =
@@ -628,6 +651,27 @@ importer msgq ImporterConfig {..} =
                           sjEnqueuedAt tbl <-. sjEnqueuedAt tblExcl,
                           sjStartedAt tbl <-. coalesce_ [just_ (sjStartedAt tblExcl), just_ (current_ (sjStartedAt tbl))] nothing_,
                           sjCompletedAt tbl <-. coalesce_ [just_ (sjCompletedAt tblExcl), just_ (current_ (sjCompletedAt tbl))] nothing_
+                        ]
+                  )
+              )
+          )
+
+    insertBushpigJobEntries :: [BushpigJob] -> Pg.Pg ()
+    insertBushpigJobEntries es =
+      runInsert $
+        Pg.insert
+          (dbBushpigJobs db)
+          (insertValues es)
+          ( Pg.onConflict
+              (Pg.conflictingFields bjId)
+              ( Pg.onConflictUpdateSet
+                  ( \tbl tblExcl ->
+                      mconcat
+                        [ bjJobId tbl <-. bjJobId tblExcl,
+                          bjClass tbl <-. bjClass tblExcl,
+                          bjParams tbl <-. bjParams tblExcl,
+                          bjStartedAt tbl <-. coalesce_ [just_ (bjStartedAt tblExcl), just_ (current_ (bjStartedAt tbl))] nothing_,
+                          bjCompletedAt tbl <-. coalesce_ [just_ (bjCompletedAt tblExcl), just_ (current_ (bjCompletedAt tbl))] nothing_
                         ]
                   )
               )

@@ -32,6 +32,7 @@ data DB f = DB
     dbProcessStats :: f (TableEntity ProcessStatsT),
     dbSidekiqQueues :: f (TableEntity SidekiqQueueT),
     dbSidekiqJobs :: f (TableEntity SidekiqJobT),
+    dbBushpigJobs :: f (TableEntity BushpigJobT),
     dbPuma :: f (TableEntity PumaT),
     dbHoneybadger :: f (TableEntity HoneybadgerT),
     dbActionController :: f (TableEntity ActionControllerT),
@@ -147,6 +148,24 @@ instance Table SidekiqJobT where
 type SidekiqJob = SidekiqJobT Identity
 
 deriving instance Show SidekiqJob
+
+data BushpigJobT f = BushpigJobT
+  { bjId :: C f Text,
+    bjJobId :: C f Text,
+    bjClass :: C f Text,
+    bjParams :: C f Value,
+    bjStartedAt :: C f (Maybe UTCTime),
+    bjCompletedAt :: C f (Maybe UTCTime)
+  }
+  deriving (Generic, Beamable)
+
+instance Table BushpigJobT where
+  data PrimaryKey BushpigJobT f = BushpigJobKey (C f Text) deriving (Generic, Beamable)
+  primaryKey = BushpigJobKey <$> bjId
+
+type BushpigJob = BushpigJobT Identity
+
+deriving instance Show BushpigJob
 
 data PumaT f = PumaT
   { pTime :: C f UTCTime,

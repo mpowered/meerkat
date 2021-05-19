@@ -67,6 +67,15 @@ CREATE TABLE sidekiq_jobs (
     completed_at timestamp with time zone
 );
 
+CREATE TABLE bushpig_jobs (
+    id text PRIMARY KEY NOT NULL,
+    job_id text NOT NULL,
+    class text NOT NULL,
+    params jsonb NOT NULL,
+    started_at timestamp with time zone,
+    completed_at timestamp with time zone
+);
+
 -- SELECT create_hypertable('sidekiq_jobs', 'enqueued_at');
 
 CREATE TABLE puma (
@@ -124,3 +133,11 @@ CREATE TABLE "mysql_processlist" (
 );
 
 SELECT create_hypertable('mysql_processlist', 'time');
+
+CREATE TABLE libyears (
+  "time" timestamp with time zone NOT NULL,
+  app text NOT NULL,
+  libyears FLOAT
+);
+
+SELECT create_hypertable('libyears', 'time');
