@@ -1,7 +1,7 @@
 let
   sources = import ./nix/sources.nix;
   pkgs = import sources.nixpkgs { inherit config; };
-  compilerVersion = "ghc8102";
+  compilerVersion = "ghc8104";
   compilerSet = pkgs.haskell.packages."${compilerVersion}";
   gitIgnore = pkgs.nix-gitignore.gitignoreSourcePure;
   config = {

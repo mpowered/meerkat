@@ -1,5 +1,12 @@
 # Changelog for meerkat
 
+## 0.5.1
+
+### Changed
+
+- Support bushpig jobs
+- ghc 8.10.4
+
 ## 0.5.0.1
 
 ### Changed

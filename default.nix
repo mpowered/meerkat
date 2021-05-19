@@ -1,1 +1,1 @@
-(import ./meerkat.nix).pkgs.haskell.packages.ghc8102.meerkat
+(import ./meerkat.nix).pkgs.haskell.packages.ghc8104.meerkat
