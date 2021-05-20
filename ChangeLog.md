@@ -1,5 +1,11 @@
 # Changelog for meerkat
 
+## 0.5.2
+
+### Changed
+
+- new fields for bushpig jobs
+
 ## 0.5.1
 
 ### Changed
