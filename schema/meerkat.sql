@@ -68,10 +68,11 @@ CREATE TABLE sidekiq_jobs (
 );
 
 CREATE TABLE bushpig_jobs (
-    id text PRIMARY KEY NOT NULL,
-    job_id text NOT NULL,
+    job_id text PRIMARY KEY NOT NULL,
+    job_key text NOT NULL,
     class text NOT NULL,
     params jsonb NOT NULL,
+    enqueued_at timestamp with time zone,
     started_at timestamp with time zone,
     completed_at timestamp with time zone
 );
