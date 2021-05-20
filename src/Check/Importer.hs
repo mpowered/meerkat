@@ -94,6 +94,7 @@ instance FromJSON Entry where
           <$> ( BushpigJobT
                   <$> e .: "jid"
                   <*> e .: "jkey"
+                  <*> e .: "host"
                   <*> e .: "class"
                   <*> (clean <$> (e .: "params"))
                   <*> e .:? "enqueued_at"

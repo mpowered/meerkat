@@ -129,6 +129,7 @@ import Database
         bjClass,
         bjCompletedAt,
         bjEnqueuedAt,
+        bjHost,
         bjJobId,
         bjJobKey,
         bjParams,
@@ -606,6 +607,7 @@ groupEntries entries =
       BushpigJobT
         { bjJobId = bjJobId b,
           bjJobKey = bjJobKey b,
+          bjHost = bjHost b,
           bjClass = bjClass b,
           bjParams = bjParams b,
           bjEnqueuedAt = bjEnqueuedAt b <|> bjEnqueuedAt a,
@@ -671,6 +673,7 @@ importer msgq ImporterConfig {..} =
                       mconcat
                         [ bjJobId tbl <-. bjJobId tblExcl,
                           bjJobKey tbl <-. bjJobKey tblExcl,
+                          bjHost tbl <-. bjHost tblExcl,
                           bjClass tbl <-. bjClass tblExcl,
                           bjParams tbl <-. bjParams tblExcl,
                           bjEnqueuedAt tbl <-. coalesce_ [just_ (bjEnqueuedAt tblExcl), just_ (current_ (bjEnqueuedAt tbl))] nothing_,

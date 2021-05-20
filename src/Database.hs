@@ -152,6 +152,7 @@ deriving instance Show SidekiqJob
 data BushpigJobT f = BushpigJobT
   { bjJobId :: C f Text,
     bjJobKey :: C f Text,
+    bjHost :: C f Text,
     bjClass :: C f Text,
     bjParams :: C f Value,
     bjEnqueuedAt :: C f (Maybe UTCTime),
