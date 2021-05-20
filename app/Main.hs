@@ -128,8 +128,9 @@ import Database
       ( BushpigJobT,
         bjClass,
         bjCompletedAt,
-        bjId,
+        bjEnqueuedAt,
         bjJobId,
+        bjJobKey,
         bjParams,
         bjStartedAt
       ),
@@ -590,7 +591,7 @@ groupEntries entries =
     byGroup (SidekiqJobEntry x) = ([], [x], [])
     byGroup (BushpigJobEntry x) = ([], [], [x])
     dedupSJ = HM.elems . HM.fromListWith sjcoalesce . map (\sj -> (sjJobId sj, sj))
-    dedupBJ = HM.elems . HM.fromListWith bjcoalesce . map (\bj -> (bjId bj, bj))
+    dedupBJ = HM.elems . HM.fromListWith bjcoalesce . map (\bj -> (bjJobId bj, bj))
     sjcoalesce a b =
       SidekiqJobT
         { sjJobId = sjJobId b,
@@ -603,10 +604,11 @@ groupEntries entries =
         }
     bjcoalesce a b =
       BushpigJobT
-        { bjId = bjId b,
-          bjJobId = bjJobId b,
+        { bjJobId = bjJobId b,
+          bjJobKey = bjJobKey b,
           bjClass = bjClass b,
           bjParams = bjParams b,
+          bjEnqueuedAt = bjEnqueuedAt b <|> bjEnqueuedAt a,
           bjStartedAt = bjStartedAt b <|> bjStartedAt a,
           bjCompletedAt = bjCompletedAt b <|> bjCompletedAt a
         }
@@ -663,13 +665,15 @@ importer msgq ImporterConfig {..} =
           (dbBushpigJobs db)
           (insertValues es)
           ( Pg.onConflict
-              (Pg.conflictingFields bjId)
+              (Pg.conflictingFields bjJobId)
               ( Pg.onConflictUpdateSet
                   ( \tbl tblExcl ->
                       mconcat
                         [ bjJobId tbl <-. bjJobId tblExcl,
+                          bjJobKey tbl <-. bjJobKey tblExcl,
                           bjClass tbl <-. bjClass tblExcl,
                           bjParams tbl <-. bjParams tblExcl,
+                          bjEnqueuedAt tbl <-. coalesce_ [just_ (bjEnqueuedAt tblExcl), just_ (current_ (bjEnqueuedAt tbl))] nothing_,
                           bjStartedAt tbl <-. coalesce_ [just_ (bjStartedAt tblExcl), just_ (current_ (bjStartedAt tbl))] nothing_,
                           bjCompletedAt tbl <-. coalesce_ [just_ (bjCompletedAt tblExcl), just_ (current_ (bjCompletedAt tbl))] nothing_
                         ]

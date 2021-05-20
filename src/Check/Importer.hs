@@ -92,10 +92,11 @@ instance FromJSON Entry where
       bushpigJob e =
         BushpigJobEntry
           <$> ( BushpigJobT
-                  <$> e .: "id"
-                  <*> e .: "jid"
+                  <$> e .: "jid"
+                  <*> e .: "jkey"
                   <*> e .: "class"
                   <*> (clean <$> (e .: "params"))
+                  <*> e .:? "enqueued_at"
                   <*> e .:? "started_at"
                   <*> e .:? "completed_at"
               )

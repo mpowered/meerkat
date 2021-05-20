@@ -150,10 +150,11 @@ type SidekiqJob = SidekiqJobT Identity
 deriving instance Show SidekiqJob
 
 data BushpigJobT f = BushpigJobT
-  { bjId :: C f Text,
-    bjJobId :: C f Text,
+  { bjJobId :: C f Text,
+    bjJobKey :: C f Text,
     bjClass :: C f Text,
     bjParams :: C f Value,
+    bjEnqueuedAt :: C f (Maybe UTCTime),
     bjStartedAt :: C f (Maybe UTCTime),
     bjCompletedAt :: C f (Maybe UTCTime)
   }
@@ -161,7 +162,7 @@ data BushpigJobT f = BushpigJobT
 
 instance Table BushpigJobT where
   data PrimaryKey BushpigJobT f = BushpigJobKey (C f Text) deriving (Generic, Beamable)
-  primaryKey = BushpigJobKey <$> bjId
+  primaryKey = BushpigJobKey <$> bjJobId
 
 type BushpigJob = BushpigJobT Identity
 
