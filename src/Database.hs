@@ -36,7 +36,8 @@ data DB f = DB
     dbPuma :: f (TableEntity PumaT),
     dbHoneybadger :: f (TableEntity HoneybadgerT),
     dbActionController :: f (TableEntity ActionControllerT),
-    dbMysqlProcesslist :: f (TableEntity MysqlProcessListT)
+    dbMysqlProcesslist :: f (TableEntity MysqlProcessListT),
+    dbFerret :: f (TableEntity FerretT)
   }
   deriving (Generic)
 
@@ -253,3 +254,22 @@ instance Table MysqlProcessListT where
 type MysqlProcessList = MysqlProcessListT Identity
 
 deriving instance Show MysqlProcessList
+
+data FerretT f = FerretT
+  { fNodeId :: C f Text,
+    fParentId :: C f (Maybe Text),
+    fHost :: C f (Maybe Text),
+    fLabel :: C f (Maybe Text),
+    fContext :: C f (Maybe Value),
+    fEnteredAt :: C f (Maybe UTCTime),
+    fLeftAt :: C f (Maybe UTCTime)
+  }
+  deriving (Generic, Beamable)
+
+instance Table FerretT where
+  data PrimaryKey FerretT f = FerretKey (C f Text) deriving (Generic, Beamable)
+  primaryKey = FerretKey <$> fNodeId
+
+type Ferret = FerretT Identity
+
+deriving instance Show Ferret

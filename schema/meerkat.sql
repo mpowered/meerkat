@@ -143,3 +143,13 @@ CREATE TABLE libyears (
 );
 
 SELECT create_hypertable('libyears', 'time');
+
+CREATE TABLE ferret (
+    node_id text PRIMARY KEY NOT NULL,
+    parent_node_id text,
+    host text NULL,
+    label text NULL,
+    context jsonb NULL,
+    entered_at timestamp with time zone,
+    left_at timestamp with time zone
+);

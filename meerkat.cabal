@@ -1,13 +1,13 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.2.
+-- This file has been generated from package.yaml by hpack version 0.34.4.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 6db0934d02e7f9b2143111d55007ae87b28a19af3191fa914dd733a20dee9282
+-- hash: 05ee85b4d8780ddbfc5c401f885b5e8e6a2dc7c60ffe5d3984b6da2cc2f75c14
 
 name:           meerkat
-version:        0.5.0.1
+version:        0.5.4
 description:    Please see the README on GitHub at <https://github.com/mpowered/meerkat#readme>
 homepage:       https://github.com/mpowered/meerkat#readme
 bug-reports:    https://github.com/mpowered/meerkat/issues
@@ -42,35 +42,35 @@ library
       src
   ghc-options: -Wall -O2
   build-depends:
-      aeson >=1.5 && <1.6
-    , aeson-extra >=0.4 && <0.5
-    , async >=2.2 && <2.3
+      aeson ==1.5.*
+    , aeson-extra >=0.4 && <0.6
+    , async ==2.2.*
     , base >=4.7 && <5
-    , beam-core >=0.9 && <0.10
-    , beam-postgres >=0.5 && <0.6
-    , bytestring >=0.10 && <0.11
-    , directory >=1.3 && <1.4
-    , errors >=2.3 && <2.4
-    , filepath >=1.4 && <1.5
-    , hedis >=0.13 && <0.14
-    , hostname >=1.0 && <1.1
-    , logging >=3.0 && <3.1
-    , megaparsec >=9.0 && <9.1
-    , modern-uri >=0.3 && <0.4
-    , optparse-applicative >=0.15 && <0.16
-    , pqueue >=1.4 && <1.5
-    , recursion-schemes >=5.2 && <5.3
-    , req >=3.8 && <3.9
-    , resource-pool >=0.2 && <0.3
-    , scientific >=0.3 && <0.4
-    , stm >=2.5 && <2.6
-    , text >=1.2 && <1.3
-    , time >=1.9 && <1.10
-    , typed-process >=0.2 && <0.3
-    , unordered-containers >=0.2 && <0.3
-    , vector >=0.12 && <0.13
-    , xeno >=0.4 && <0.5
-    , yaml >=0.11 && <0.12
+    , beam-core ==0.9.*
+    , beam-postgres ==0.5.*
+    , bytestring ==0.10.*
+    , directory ==1.3.*
+    , errors ==2.3.*
+    , filepath ==1.4.*
+    , hedis >=0.13 && <0.15
+    , hostname ==1.0.*
+    , logging ==3.0.*
+    , megaparsec ==9.0.*
+    , modern-uri ==0.3.*
+    , optparse-applicative >=0.15 && <0.17
+    , pqueue ==1.4.*
+    , recursion-schemes ==5.2.*
+    , req >=3.8 && <3.10
+    , resource-pool ==0.2.*
+    , scientific ==0.3.*
+    , stm ==2.5.*
+    , text ==1.2.*
+    , time ==1.9.*
+    , typed-process ==0.2.*
+    , unordered-containers ==0.2.*
+    , vector ==0.12.*
+    , xeno ==0.4.*
+    , yaml ==0.11.*
   default-language: Haskell2010
 
 executable meerkat
@@ -81,36 +81,36 @@ executable meerkat
       app
   ghc-options: -Wall -O2 -threaded -rtsopts "-with-rtsopts=-N -Iw60 --disable-delayed-os-memory-return"
   build-depends:
-      aeson >=1.5 && <1.6
-    , aeson-extra >=0.4 && <0.5
-    , async >=2.2 && <2.3
+      aeson ==1.5.*
+    , aeson-extra >=0.4 && <0.6
+    , async ==2.2.*
     , base >=4.7 && <5
-    , beam-core >=0.9 && <0.10
-    , beam-postgres >=0.5 && <0.6
-    , bytestring >=0.10 && <0.11
-    , directory >=1.3 && <1.4
-    , errors >=2.3 && <2.4
-    , filepath >=1.4 && <1.5
-    , hedis >=0.13 && <0.14
-    , hostname >=1.0 && <1.1
-    , logging >=3.0 && <3.1
+    , beam-core ==0.9.*
+    , beam-postgres ==0.5.*
+    , bytestring ==0.10.*
+    , directory ==1.3.*
+    , errors ==2.3.*
+    , filepath ==1.4.*
+    , hedis >=0.13 && <0.15
+    , hostname ==1.0.*
+    , logging ==3.0.*
     , meerkat
-    , megaparsec >=9.0 && <9.1
-    , modern-uri >=0.3 && <0.4
-    , optparse-applicative >=0.15 && <0.16
-    , pqueue >=1.4 && <1.5
-    , recursion-schemes >=5.2 && <5.3
-    , req >=3.8 && <3.9
-    , resource-pool >=0.2 && <0.3
-    , scientific >=0.3 && <0.4
-    , stm >=2.5 && <2.6
-    , text >=1.2 && <1.3
-    , time >=1.9 && <1.10
-    , typed-process >=0.2 && <0.3
-    , unordered-containers >=0.2 && <0.3
-    , vector >=0.12 && <0.13
-    , xeno >=0.4 && <0.5
-    , yaml >=0.11 && <0.12
+    , megaparsec ==9.0.*
+    , modern-uri ==0.3.*
+    , optparse-applicative >=0.15 && <0.17
+    , pqueue ==1.4.*
+    , recursion-schemes ==5.2.*
+    , req >=3.8 && <3.10
+    , resource-pool ==0.2.*
+    , scientific ==0.3.*
+    , stm ==2.5.*
+    , text ==1.2.*
+    , time ==1.9.*
+    , typed-process ==0.2.*
+    , unordered-containers ==0.2.*
+    , vector ==0.12.*
+    , xeno ==0.4.*
+    , yaml ==0.11.*
   default-language: Haskell2010
 
 test-suite spec
@@ -122,34 +122,34 @@ test-suite spec
       test
   ghc-options: -Wall -O2
   build-depends:
-      aeson >=1.5 && <1.6
-    , aeson-extra >=0.4 && <0.5
-    , async >=2.2 && <2.3
+      aeson ==1.5.*
+    , aeson-extra >=0.4 && <0.6
+    , async ==2.2.*
     , base >=4.7 && <5
-    , beam-core >=0.9 && <0.10
-    , beam-postgres >=0.5 && <0.6
-    , bytestring >=0.10 && <0.11
-    , directory >=1.3 && <1.4
-    , errors >=2.3 && <2.4
-    , filepath >=1.4 && <1.5
-    , hedis >=0.13 && <0.14
-    , hostname >=1.0 && <1.1
-    , logging >=3.0 && <3.1
+    , beam-core ==0.9.*
+    , beam-postgres ==0.5.*
+    , bytestring ==0.10.*
+    , directory ==1.3.*
+    , errors ==2.3.*
+    , filepath ==1.4.*
+    , hedis >=0.13 && <0.15
+    , hostname ==1.0.*
+    , logging ==3.0.*
     , meerkat
-    , megaparsec >=9.0 && <9.1
-    , modern-uri >=0.3 && <0.4
-    , optparse-applicative >=0.15 && <0.16
-    , pqueue >=1.4 && <1.5
-    , recursion-schemes >=5.2 && <5.3
-    , req >=3.8 && <3.9
-    , resource-pool >=0.2 && <0.3
-    , scientific >=0.3 && <0.4
-    , stm >=2.5 && <2.6
-    , text >=1.2 && <1.3
-    , time >=1.9 && <1.10
-    , typed-process >=0.2 && <0.3
-    , unordered-containers >=0.2 && <0.3
-    , vector >=0.12 && <0.13
-    , xeno >=0.4 && <0.5
-    , yaml >=0.11 && <0.12
+    , megaparsec ==9.0.*
+    , modern-uri ==0.3.*
+    , optparse-applicative >=0.15 && <0.17
+    , pqueue ==1.4.*
+    , recursion-schemes ==5.2.*
+    , req >=3.8 && <3.10
+    , resource-pool ==0.2.*
+    , scientific ==0.3.*
+    , stm ==2.5.*
+    , text ==1.2.*
+    , time ==1.9.*
+    , typed-process ==0.2.*
+    , unordered-containers ==0.2.*
+    , vector ==0.12.*
+    , xeno ==0.4.*
+    , yaml ==0.11.*
   default-language: Haskell2010

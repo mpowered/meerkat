@@ -1,5 +1,11 @@
 # Changelog for meerkat
 
+## 0.5.4
+
+### Changed
+
+- Support Ferret
+
 ## 0.5.3
 
 ### Changed

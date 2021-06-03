@@ -104,6 +104,7 @@ import Database
       ( dbActionController,
         dbBushpigJobs,
         dbDiskSpaceUsage,
+        dbFerret,
         dbHoneybadger,
         dbMemoryUsage,
         dbMysqlProcesslist,
@@ -134,6 +135,17 @@ import Database
         bjJobKey,
         bjParams,
         bjStartedAt
+      ),
+    Ferret,
+    FerretT
+      ( FerretT,
+        fNodeId,
+        fParentId,
+        fHost,
+        fLabel,
+        fContext,
+        fEnteredAt,
+        fLeftAt
       ),
     db,
   )
@@ -583,16 +595,18 @@ mysql msgq bin hostname = do
     insertAction :: [MysqlProcessList] -> m ()
     insertAction = runInsert . insert (dbMysqlProcesslist db) . insertValues
 
-groupEntries :: [Entry] -> ([ActionController], [SidekiqJob], [BushpigJob])
+groupEntries :: [Entry] -> ([ActionController], [SidekiqJob], [BushpigJob], [Ferret])
 groupEntries entries =
-  let (acs, sjs, bjs) = go entries in (acs, dedupSJ sjs, dedupBJ bjs)
+  let (acs, sjs, bjs, fs) = go entries in (acs, dedupSJ sjs, dedupBJ bjs, dedupF fs)
   where
     go es = mconcat (map byGroup es)
-    byGroup (ActionControllerEntry x) = ([x], [], [])
-    byGroup (SidekiqJobEntry x) = ([], [x], [])
-    byGroup (BushpigJobEntry x) = ([], [], [x])
+    byGroup (ActionControllerEntry x) = ([x], [], [], [])
+    byGroup (SidekiqJobEntry x) = ([], [x], [], [])
+    byGroup (BushpigJobEntry x) = ([], [], [x], [])
+    byGroup (FerretEntry x) = ([], [], [], [x])
     dedupSJ = HM.elems . HM.fromListWith sjcoalesce . map (\sj -> (sjJobId sj, sj))
     dedupBJ = HM.elems . HM.fromListWith bjcoalesce . map (\bj -> (bjJobId bj, bj))
+    dedupF = HM.elems . HM.fromListWith fcoalesce . map (\f -> (fNodeId f, f))
     sjcoalesce a b =
       SidekiqJobT
         { sjJobId = sjJobId b,
@@ -614,6 +628,16 @@ groupEntries entries =
           bjStartedAt = bjStartedAt b <|> bjStartedAt a,
           bjCompletedAt = bjCompletedAt b <|> bjCompletedAt a
         }
+    fcoalesce a b =
+      FerretT
+        { fNodeId = fNodeId b,
+          fParentId = fParentId b <|> fParentId a,
+          fHost = fHost b <|> fHost a,
+          fLabel = fLabel b <|> fLabel a,
+          fContext = fContext b <|> fContext a,
+          fEnteredAt = fEnteredAt b <|> fEnteredAt a,
+          fLeftAt = fLeftAt b <|> fLeftAt a
+        }
 
 importer ::
   MessageQueue Pg.Pg ->
@@ -627,10 +651,11 @@ importer msgq ImporterConfig {..} =
   where
     insertAction :: [Entry] -> Pg.Pg ()
     insertAction entries = do
-      let (ac, sj, bj) = groupEntries entries
+      let (ac, sj, bj, f) = groupEntries entries
       unless (null ac) $ insertActionControllerEntries ac
       unless (null sj) $ insertSidekiqJobEntries sj
       unless (null bj) $ insertBushpigJobEntries bj
+      unless (null f) $ insertFerretEntries f
 
     insertActionControllerEntries :: [ActionController] -> Pg.Pg ()
     insertActionControllerEntries es =
@@ -679,6 +704,29 @@ importer msgq ImporterConfig {..} =
                           bjEnqueuedAt tbl <-. coalesce_ [just_ (bjEnqueuedAt tblExcl), just_ (current_ (bjEnqueuedAt tbl))] nothing_,
                           bjStartedAt tbl <-. coalesce_ [just_ (bjStartedAt tblExcl), just_ (current_ (bjStartedAt tbl))] nothing_,
                           bjCompletedAt tbl <-. coalesce_ [just_ (bjCompletedAt tblExcl), just_ (current_ (bjCompletedAt tbl))] nothing_
+                        ]
+                  )
+              )
+          )
+
+    insertFerretEntries :: [Ferret] -> Pg.Pg ()
+    insertFerretEntries fs =
+      runInsert $
+        Pg.insert
+          (dbFerret db)
+          (insertValues fs)
+          ( Pg.onConflict
+              (Pg.conflictingFields fNodeId)
+              ( Pg.onConflictUpdateSet
+                  ( \tbl tblExcl ->
+                      mconcat
+                        [ fNodeId tbl <-. fNodeId tblExcl,
+                          fParentId tbl <-. coalesce_ [just_ (fParentId tblExcl), just_ (current_ (fParentId tbl))] nothing_,
+                          fHost tbl <-. coalesce_ [just_ (fHost tblExcl), just_ (current_ (fHost tbl))] nothing_,
+                          fLabel tbl <-. coalesce_ [just_ (fLabel tblExcl), just_ (current_ (fLabel tbl))] nothing_,
+                          fContext tbl <-. coalesce_ [just_ (fContext tblExcl), just_ (current_ (fContext tbl))] nothing_,
+                          fEnteredAt tbl <-. coalesce_ [just_ (fEnteredAt tblExcl), just_ (current_ (fEnteredAt tbl))] nothing_,
+                          fLeftAt tbl <-. coalesce_ [just_ (fLeftAt tblExcl), just_ (current_ (fLeftAt tbl))] nothing_
                         ]
                   )
               )

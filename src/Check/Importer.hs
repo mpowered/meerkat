@@ -34,6 +34,8 @@ import Database
     SidekiqJobT (SidekiqJobT),
     BushpigJob,
     BushpigJobT (BushpigJobT),
+    Ferret,
+    FerretT (FerretT),
   )
 import System.Directory
   ( doesFileExist,
@@ -47,6 +49,7 @@ data Entry
   = ActionControllerEntry ActionController
   | SidekiqJobEntry SidekiqJob
   | BushpigJobEntry BushpigJob
+  | FerretEntry Ferret
 
 instance FromJSON Entry where
   parseJSON = withObject "Entry" $ \e -> do
@@ -55,6 +58,7 @@ instance FromJSON Entry where
       "action_controller" -> actionController e
       "sidekiq_job" -> sidekiqJob e
       "bushpig_job" -> bushpigJob e
+      "ferret" -> ferret e
       invalid -> fail ("unexpected Entry type " <> invalid)
     where
       actionController e =
@@ -100,6 +104,17 @@ instance FromJSON Entry where
                   <*> e .:? "enqueued_at"
                   <*> e .:? "started_at"
                   <*> e .:? "completed_at"
+              )
+      ferret e =
+        FerretEntry
+          <$> ( FerretT
+                  <$> e .: "node_id"
+                  <*> e .:? "parent_id"
+                  <*> e .:? "host"
+                  <*> e .:? "label"
+                  <*> (fmap clean <$> (e .:? "context"))
+                  <*> e .:? "entered_at"
+                  <*> e .:? "left_at"
               )
 
 -- Clean a JSON value suitable for Postgresql's jsonb
