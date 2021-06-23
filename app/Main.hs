@@ -100,30 +100,6 @@ import Data.Yaml
   )
 import Database
   ( ActionController,
-    DB
-      ( dbActionController,
-        dbBushpigJobs,
-        dbDiskSpaceUsage,
-        dbFerret,
-        dbHoneybadger,
-        dbMemoryUsage,
-        dbMysqlProcesslist,
-        dbProcessStats,
-        dbPuma,
-        dbSidekiqJobs,
-        dbSidekiqQueues
-      ),
-    SidekiqJob,
-    SidekiqJobT
-      ( SidekiqJobT,
-        sjClass,
-        sjCompletedAt,
-        sjEnqueuedAt,
-        sjJobId,
-        sjParams,
-        sjQueue,
-        sjStartedAt
-      ),
     BushpigJob,
     BushpigJobT
       ( BushpigJobT,
@@ -136,16 +112,42 @@ import Database
         bjParams,
         bjStartedAt
       ),
+    DB
+      ( dbActionController,
+        dbBushpigJobs,
+        dbDiskSpaceUsage,
+        dbFerret,
+        dbHierarchyChecks,
+        dbHoneybadger,
+        dbMemoryUsage,
+        dbMysqlProcesslist,
+        dbProcessStats,
+        dbPuma,
+        dbSidekiqJobs,
+        dbSidekiqQueues
+      ),
     Ferret,
     FerretT
       ( FerretT,
-        fNodeId,
-        fParentId,
-        fHost,
-        fLabel,
         fContext,
         fEnteredAt,
-        fLeftAt
+        fHost,
+        fLabel,
+        fLeftAt,
+        fNodeId,
+        fParentId
+      ),
+    HierarchyChecks,
+    SidekiqJob,
+    SidekiqJobT
+      ( SidekiqJobT,
+        sjClass,
+        sjCompletedAt,
+        sjEnqueuedAt,
+        sjJobId,
+        sjParams,
+        sjQueue,
+        sjStartedAt
       ),
     db,
   )
@@ -595,15 +597,16 @@ mysql msgq bin hostname = do
     insertAction :: [MysqlProcessList] -> m ()
     insertAction = runInsert . insert (dbMysqlProcesslist db) . insertValues
 
-groupEntries :: [Entry] -> ([ActionController], [SidekiqJob], [BushpigJob], [Ferret])
+groupEntries :: [Entry] -> ([ActionController], [SidekiqJob], [BushpigJob], [Ferret], [HierarchyChecks])
 groupEntries entries =
-  let (acs, sjs, bjs, fs) = go entries in (acs, dedupSJ sjs, dedupBJ bjs, dedupF fs)
+  let (acs, sjs, bjs, fs, hcs) = go entries in (acs, dedupSJ sjs, dedupBJ bjs, dedupF fs, hcs)
   where
     go es = mconcat (map byGroup es)
-    byGroup (ActionControllerEntry x) = ([x], [], [], [])
-    byGroup (SidekiqJobEntry x) = ([], [x], [], [])
-    byGroup (BushpigJobEntry x) = ([], [], [x], [])
-    byGroup (FerretEntry x) = ([], [], [], [x])
+    byGroup (ActionControllerEntry x) = ([x], [], [], [], [])
+    byGroup (SidekiqJobEntry x) = ([], [x], [], [], [])
+    byGroup (BushpigJobEntry x) = ([], [], [x], [], [])
+    byGroup (FerretEntry x) = ([], [], [], [x], [])
+    byGroup (HierarchyCheckEntry x) = ([], [], [], [], [x])
     dedupSJ = HM.elems . HM.fromListWith sjcoalesce . map (\sj -> (sjJobId sj, sj))
     dedupBJ = HM.elems . HM.fromListWith bjcoalesce . map (\bj -> (bjJobId bj, bj))
     dedupF = HM.elems . HM.fromListWith fcoalesce . map (\f -> (fNodeId f, f))
@@ -651,11 +654,12 @@ importer msgq ImporterConfig {..} =
   where
     insertAction :: [Entry] -> Pg.Pg ()
     insertAction entries = do
-      let (ac, sj, bj, f) = groupEntries entries
+      let (ac, sj, bj, f, hc) = groupEntries entries
       unless (null ac) $ insertActionControllerEntries ac
       unless (null sj) $ insertSidekiqJobEntries sj
       unless (null bj) $ insertBushpigJobEntries bj
       unless (null f) $ insertFerretEntries f
+      unless (null hc) $ insertHierarchyChecksEntries hc
 
     insertActionControllerEntries :: [ActionController] -> Pg.Pg ()
     insertActionControllerEntries es =
@@ -731,6 +735,12 @@ importer msgq ImporterConfig {..} =
                   )
               )
           )
+
+    insertHierarchyChecksEntries :: [HierarchyChecks] -> Pg.Pg ()
+    insertHierarchyChecksEntries hcs =
+      runInsert $
+        insert (dbHierarchyChecks db) $
+          insertValues hcs
 
 runScheduler :: Scheduler -> IO ()
 runScheduler scheduler =

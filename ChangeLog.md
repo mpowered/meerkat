@@ -1,5 +1,11 @@
 # Changelog for meerkat
 
+## 0.5.5
+
+### Changed
+
+- Support hierarchy checks
+
 ## 0.5.4
 
 ### Changed

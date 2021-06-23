@@ -37,7 +37,8 @@ data DB f = DB
     dbHoneybadger :: f (TableEntity HoneybadgerT),
     dbActionController :: f (TableEntity ActionControllerT),
     dbMysqlProcesslist :: f (TableEntity MysqlProcessListT),
-    dbFerret :: f (TableEntity FerretT)
+    dbFerret :: f (TableEntity FerretT),
+    dbHierarchyChecks :: f (TableEntity HierarchyChecksT)
   }
   deriving (Generic)
 
@@ -273,3 +274,20 @@ instance Table FerretT where
 type Ferret = FerretT Identity
 
 deriving instance Show Ferret
+
+data HierarchyChecksT f = HierarchyChecksT
+  { hcTime :: C f UTCTime,
+    hcTable :: C f Text,
+    hcPkey :: C f Integer,
+    hcResult :: C f Bool,
+    hcComments :: C f (Maybe Text)
+  }
+  deriving (Generic, Beamable)
+
+instance Table HierarchyChecksT where
+  data PrimaryKey HierarchyChecksT f = HierarchyChecksKey (C f UTCTime) (C f Text) (C f Integer) deriving (Generic, Beamable)
+  primaryKey = HierarchyChecksKey <$> hcTime <*> hcTable <*> hcPkey
+
+type HierarchyChecks = HierarchyChecksT Identity
+
+deriving instance Show HierarchyChecks

@@ -36,6 +36,8 @@ import Database
     BushpigJobT (BushpigJobT),
     Ferret,
     FerretT (FerretT),
+    HierarchyChecks,
+    HierarchyChecksT (HierarchyChecksT)
   )
 import System.Directory
   ( doesFileExist,
@@ -50,6 +52,7 @@ data Entry
   | SidekiqJobEntry SidekiqJob
   | BushpigJobEntry BushpigJob
   | FerretEntry Ferret
+  | HierarchyCheckEntry HierarchyChecks
 
 instance FromJSON Entry where
   parseJSON = withObject "Entry" $ \e -> do
@@ -59,6 +62,7 @@ instance FromJSON Entry where
       "sidekiq_job" -> sidekiqJob e
       "bushpig_job" -> bushpigJob e
       "ferret" -> ferret e
+      "hierarchy_check" -> hierarchyCheck e
       invalid -> fail ("unexpected Entry type " <> invalid)
     where
       actionController e =
@@ -115,6 +119,15 @@ instance FromJSON Entry where
                   <*> (fmap clean <$> (e .:? "context"))
                   <*> e .:? "entered_at"
                   <*> e .:? "left_at"
+              )
+      hierarchyCheck e =
+        HierarchyCheckEntry
+          <$> ( HierarchyChecksT
+                  <$> e .: "time"
+                  <*> e .: "table"
+                  <*> e .: "pkey"
+                  <*> e .: "result"
+                  <*> e .:? "comments"
               )
 
 -- Clean a JSON value suitable for Postgresql's jsonb
