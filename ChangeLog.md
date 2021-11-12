@@ -1,5 +1,12 @@
 # Changelog for meerkat
 
+## 0.5.6
+
+### Changed
+
+- allow multiple puma checks, config file adjusted
+- instance field added for puma
+
 ## 0.5.5
 
 ### Changed

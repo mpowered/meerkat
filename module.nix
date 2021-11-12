@@ -7,22 +7,21 @@ let
     sha256 = "SHA";
   };
   meerkat = (import src {}).meerkat;
-  meerkatConfig = pkgs.writeText "meerkat.yaml" ''
-host: ${cfg.host}
-logging:
-  # logfile: "meerkat.log"
-  loglevel: info
-database:
-  host: ${cfg.database.host}
-  port: ${toString cfg.database.port}
-  user: ${cfg.database.user}
-  password: ${cfg.database.password}
-  database: ${cfg.database.database}
-binaries:
-  df: ${pkgs.coreutils}/bin/df
-  free: ${pkgs.procps}/bin/free
-  pidstat: ${pkgs.sysstat}/bin/pidstat
-'';
+  meerkatConfig = pkgs.writeText "meerkat.yaml" lib.generators.toYAML {} {
+    inherit (cfg) host;
+    logging = {
+      # logfile = "meerkat.log";
+      loglevel = "info";
+    };
+    database = {
+      inherit (cfg.database) host port user password database;
+    };
+    binaries = {
+      df = "${pkgs.coreutils}/bin/df";
+      free = "${pkgs.procps}/bin/free";
+      pidstat = "${pkgs.sysstat}/bin/pidstat";
+    };
+  };
 
 in {
   options.services.meerkat = {

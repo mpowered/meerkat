@@ -21,5 +21,6 @@ sidekiq:
   - redis://localhost/5
   - redis://localhost/6
 puma:
-  url: http://localhost:9292/stats
-  token: secret
+  toolkit:
+    url: http://localhost:9292/stats
+    token: secret

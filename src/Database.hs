@@ -174,6 +174,7 @@ deriving instance Show BushpigJob
 data PumaT f = PumaT
   { pTime :: C f UTCTime,
     pHost :: C f Text,
+    pInstance :: C f Text,
     pWorker :: C f Integer,
     pBacklog :: C f Integer,
     pRunning :: C f Integer,

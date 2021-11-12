@@ -82,8 +82,8 @@ instance FromJSON Status where
       <*> o .: "pool_capacity"
       <*> o .: "max_threads"
 
-pumaStats :: PumaCtl -> Text.Text -> UTCTime -> ExceptT String IO [Puma]
-pumaStats (PumaCtl url opts) host timestamp = do
+pumaStats :: Text.Text -> PumaCtl -> Text.Text -> UTCTime -> ExceptT String IO [Puma]
+pumaStats inst (PumaCtl url opts) host timestamp = do
   stats <-
     runReq defaultHttpConfig $
       req GET url NoReqBody jsonResponse opts
@@ -95,6 +95,7 @@ pumaStats (PumaCtl url opts) host timestamp = do
           [ PumaT
               { pTime = timestamp,
                 pHost = host,
+                pInstance = inst,
                 pWorker = workerIndex w,
                 pBacklog = statusBacklog status,
                 pRunning = statusRunning status,

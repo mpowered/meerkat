@@ -1,10 +1,10 @@
 name:                meerkat
-version:             0.5.5
+version:             0.5.6
 github:              "mpowered/meerkat"
 license:             BSD3
 author:              "Shaun Sharples"
 maintainer:          "shaun.sharples@gmail.com"
-copyright:           "2020 Shaun Sharples"
+copyright:           "2021 Shaun Sharples"
 description:         Please see the README on GitHub at <https://github.com/mpowered/meerkat#readme>
 
 extra-source-files:

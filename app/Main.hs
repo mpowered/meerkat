@@ -184,7 +184,7 @@ data Config = Config
     cfgDatabase :: Pg.ConnectInfo,
     cfgBinaries :: BinConfig,
     cfgSidekiq :: Maybe SidekiqConfig,
-    cfgPuma :: Maybe PumaConfig,
+    cfgPuma :: HM.HashMap Text PumaConfig,
     cfgHoneybadger :: Maybe HoneybadgerConfig,
     cfgImporter :: Maybe ImporterConfig
   }
@@ -230,10 +230,10 @@ instance FromJSON Config where
     Config
       <$> o .:? "hostname"
       <*> o .:? "logging" .!= defaultLogConfig
-      <*> o .: "database"
+      <*> o .:  "database"
       <*> o .:? "binaries" .!= defaultBinConfig
       <*> o .:? "sidekiq"
-      <*> o .:? "puma"
+      <*> o .:? "puma" .!= HM.empty
       <*> o .:? "honeybadger"
       <*> o .:? "importer"
 
@@ -406,7 +406,7 @@ app Config {..} = do
 
   df <- newPeriodicJob "Check disk space usage" (diskspace msgq (cfgDF cfgBinaries) hostname) 60
   mem <- newPeriodicJob "Check memory usage" (memory msgq (cfgFree cfgBinaries) hostname) 20
-  p <- traverse (\cfg -> newPeriodicJob "Poll Puma statistics" (puma msgq (cfgPumaCtl cfg) hostname) 20) cfgPuma
+  p <- HM.traverseWithKey (\inst cfg -> newPeriodicJob "Poll Puma statistics" (puma msgq inst (cfgPumaCtl cfg) hostname) 20) cfgPuma
   hb <- traverse (\cfg -> newPeriodicJob "Poll Honeybadger" (honeybadger msgq cfg) 600) cfgHoneybadger
   i <- traverse (\cfg -> newPeriodicJob "Importer" (importer msgq cfg) 60) cfgImporter
   pidstat1 <- newPeriodicJob "Check process statistics" (pidstats msgq (cfgPidstat cfgBinaries) hostname) 120
@@ -419,7 +419,6 @@ app Config {..} = do
             [ Just (now, df),
               Just (now, mem),
               (now,) <$> sk,
-              (now,) <$> p,
               (now,) <$> hb,
               (now,) <$> i,
               (now,) <$> my,
@@ -427,7 +426,7 @@ app Config {..} = do
               -- each one is expected to collect stats for 1 minute
               Just (now, pidstat1),
               Just (addUTCTime 60 now, pidstat2)
-            ]
+            ] ++ ((now,) <$> HM.elems p)
   logger <-
     async $
       -- Pool with just a single connection that closes after 120s of idle
@@ -551,15 +550,16 @@ puma ::
   forall be m.
   (BeamSqlBackend be, MonadBeam be m, FieldsFulfillConstraint (BeamSqlBackendCanSerialize be) PumaT) =>
   MessageQueue m ->
+  Text ->
   PumaCtl ->
   Text ->
   IO ()
-puma msgq ctl hostname = do
+puma msgq inst ctl hostname = do
   now <- getCurrentTime
   exceptT
     print
     (atomically . sendMessage msgq . SampleData . insertAction)
-    (pumaStats ctl hostname now)
+    (pumaStats inst ctl hostname now)
   where
     insertAction :: [Puma] -> m ()
     insertAction = runInsert . insert (dbPuma db) . insertValues
