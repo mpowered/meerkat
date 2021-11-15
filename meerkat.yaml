@@ -13,7 +13,7 @@ binaries:
   pidstat: pidstat
   mysql: mysql
 importer:
-  path: import
+  - path: import
 sidekiq:
   databases:
   - redis://localhost/3

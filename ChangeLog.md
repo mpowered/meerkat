@@ -1,5 +1,11 @@
 # Changelog for meerkat
 
+## 0.5.7
+
+### Changed
+
+- allow multiple importers
+
 ## 0.5.6
 
 ### Changed

@@ -186,7 +186,7 @@ data Config = Config
     cfgSidekiq :: Maybe SidekiqConfig,
     cfgPuma :: HM.HashMap Text PumaConfig,
     cfgHoneybadger :: Maybe HoneybadgerConfig,
-    cfgImporter :: Maybe ImporterConfig
+    cfgImporter :: [ImporterConfig]
   }
 
 data BinConfig = BinConfig
@@ -235,7 +235,7 @@ instance FromJSON Config where
       <*> o .:? "sidekiq"
       <*> o .:? "puma" .!= HM.empty
       <*> o .:? "honeybadger"
-      <*> o .:? "importer"
+      <*> o .:? "importer" .!= []
 
 instance FromJSON LogConfig where
   parseJSON = withObject "LogConfig" $ \o ->
@@ -420,13 +420,13 @@ app Config {..} = do
               Just (now, mem),
               (now,) <$> sk,
               (now,) <$> hb,
-              (now,) <$> i,
               (now,) <$> my,
               -- run two instances of pidstat, each triggered every 2 mins
               -- each one is expected to collect stats for 1 minute
               Just (now, pidstat1),
               Just (addUTCTime 60 now, pidstat2)
-            ] ++ ((now,) <$> HM.elems p)
+            ] ++ ((now,) <$> i)
+              ++ ((now,) <$> HM.elems p)
   logger <-
     async $
       -- Pool with just a single connection that closes after 120s of idle
